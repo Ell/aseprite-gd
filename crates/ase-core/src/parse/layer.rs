@@ -40,6 +40,7 @@ pub fn parse_layer(r: &mut Reader, opacity_valid: bool, has_uuid: bool) -> Resul
         name,
         parent: None, // derived by the caller from child levels
         uuid,
+        user_data: Default::default(),
     })
 }
 

@@ -129,5 +129,5 @@ pub fn parse_cel(
         _ => return Err(ParseError::Invalid { offset: start, what: "cel type" }),
     };
 
-    Ok(Some(Cel { layer_index, x, y, opacity, z_index, content }))
+    Ok(Some(Cel { layer_index, x, y, opacity, z_index, content, extra: None, user_data: Default::default() }))
 }

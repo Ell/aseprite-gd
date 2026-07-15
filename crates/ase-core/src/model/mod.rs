@@ -172,6 +172,7 @@ pub struct Layer {
     /// child levels during parsing.
     pub parent: Option<usize>,
     pub uuid: Option<[u8; 16]>,
+    pub user_data: UserData,
 }
 
 impl Layer {
@@ -230,6 +231,8 @@ pub struct Cel {
     pub opacity: u8,
     pub z_index: i16,
     pub content: CelContent,
+    pub extra: Option<CelExtra>,
+    pub user_data: UserData,
 }
 
 /// Tag loop direction (§6.9). Out-of-range values decode as Forward
@@ -254,6 +257,9 @@ pub struct Tag {
     /// user data chunk in v1.3 files (not yet parsed).
     pub color: [u8; 3],
     pub name: String,
+    /// v1.3 files attach one user data chunk per tag (in order) right after
+    /// the tags chunk; the authoritative tag color lives there (gotcha #18).
+    pub user_data: UserData,
 }
 
 /// One tileset (§6.13).
@@ -270,6 +276,10 @@ pub struct Tileset {
     /// `[i*tile_height, (i+1)*tile_height)`. Absent for external tilesets.
     pub pixels: Option<Vec<u8>>,
     pub external: Option<(u32, u32)>,
+    pub user_data: UserData,
+    /// Per-tile user data, indexed by tile ID; present only in files written
+    /// with per-tile data (gotcha #17).
+    pub tile_user_data: Vec<UserData>,
 }
 
 impl Tileset {
@@ -283,6 +293,83 @@ impl Tileset {
 #[derive(Debug, Clone, Default)]
 pub struct Palette {
     pub entries: Vec<[u8; 4]>,
+}
+
+/// A typed user-data property value (§6.11).
+#[derive(Debug, Clone, PartialEq)]
+pub enum PropertyValue {
+    Bool(bool),
+    I8(i8),
+    U8(u8),
+    I16(i16),
+    U16(u16),
+    I32(i32),
+    U32(u32),
+    I64(i64),
+    U64(u64),
+    /// 16.16 fixed point, converted.
+    Fixed(f64),
+    F32(f32),
+    F64(f64),
+    Str(String),
+    Point(i32, i32),
+    Size(i32, i32),
+    Rect(i32, i32, i32, i32),
+    Vector(Vec<PropertyValue>),
+    Map(Properties),
+    Uuid([u8; 16]),
+}
+
+/// Ordered name→value pairs (order preserved for deterministic output).
+pub type Properties = Vec<(String, PropertyValue)>;
+
+/// One properties map inside a user data chunk. Key 0 = user properties;
+/// other keys reference an External Files entry (extension data).
+#[derive(Debug, Clone, PartialEq)]
+pub struct PropertiesMap {
+    pub key: u32,
+    pub properties: Properties,
+}
+
+/// User data attached to an object (§6.11).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct UserData {
+    pub text: Option<String>,
+    pub color: Option<[u8; 4]>,
+    pub maps: Vec<PropertiesMap>,
+}
+
+impl UserData {
+    pub fn is_empty(&self) -> bool {
+        self.text.is_none() && self.color.is_none() && self.maps.is_empty()
+    }
+}
+
+/// Cel extra chunk 0x2006: precise subpixel bounds (§6.4).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CelExtra {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+/// Color profile chunk 0x2007 (§6.5).
+#[derive(Debug, Clone, PartialEq)]
+pub enum ColorProfile {
+    /// Old files: no profile recorded.
+    None { fixed_gamma: Option<f64> },
+    Srgb { fixed_gamma: Option<f64> },
+    Icc { fixed_gamma: Option<f64>, data: Vec<u8> },
+}
+
+/// External files chunk entry (§6.6).
+#[derive(Debug, Clone, PartialEq)]
+pub struct ExternalFile {
+    pub id: u32,
+    /// 0=palette, 1=tileset, 2=properties extension, 3=tile-management extension.
+    pub kind: u8,
+    pub name: String,
 }
 
 /// One slice key: valid from `frame` until the next key (§6.12).
@@ -305,6 +392,7 @@ pub struct SliceKey {
 pub struct Slice {
     pub name: String,
     pub keys: Vec<SliceKey>,
+    pub user_data: UserData,
 }
 
 impl Slice {

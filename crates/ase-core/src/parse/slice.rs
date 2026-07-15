@@ -32,7 +32,7 @@ pub fn parse_slice(r: &mut Reader) -> Result<Slice> {
         let pivot = if flags & 2 != 0 { Some((r.i32()?, r.i32()?)) } else { None };
         keys.push(SliceKey { frame, x, y, width, height, center, pivot });
     }
-    Ok(Slice { name, keys })
+    Ok(Slice { name, keys, user_data: Default::default() })
 }
 
 #[cfg(test)]

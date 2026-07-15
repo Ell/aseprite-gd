@@ -22,7 +22,7 @@ pub fn parse_tags(r: &mut Reader) -> Result<Vec<Tag>> {
         let color = [r.u8()?, r.u8()?, r.u8()?];
         r.skip(1)?; // extra byte
         let name = r.string()?;
-        tags.push(Tag { from_frame, to_frame, direction, repeat, color, name });
+        tags.push(Tag { from_frame, to_frame, direction, repeat, color, name, user_data: Default::default() });
     }
     Ok(tags)
 }

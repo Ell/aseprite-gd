@@ -43,5 +43,17 @@ pub fn parse_tileset(
         None
     };
 
-    Ok(Tileset { id, flags, num_tiles, tile_width, tile_height, base_index, name, pixels, external })
+    Ok(Tileset {
+        id,
+        flags,
+        num_tiles,
+        tile_width,
+        tile_height,
+        base_index,
+        name,
+        pixels,
+        external,
+        user_data: Default::default(),
+        tile_user_data: Vec::new(),
+    })
 }
