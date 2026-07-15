@@ -8,7 +8,22 @@ cd "$(dirname "$0")/../.."
 OUT=crates/ase-core/tests/fixtures/generated
 mkdir -p "$OUT"
 
-ASEPRITE=${ASEPRITE:-aseprite}
+# Resolution order: explicit $ASEPRITE, working system binary, Steam build.
+# The Steam build bundles its own deps, so it survives the cmark soname
+# bumps that break the AUR package.
+if [[ -z "${ASEPRITE:-}" ]]; then
+    if command -v aseprite >/dev/null && aseprite -b --version >/dev/null 2>&1; then
+        ASEPRITE=aseprite
+    else
+        for lib in "$HOME/.local/share/Steam" "$HOME/.steam/steam" /mnt/games/SteamLibrary; do
+            if [[ -x "$lib/steamapps/common/Aseprite/aseprite" ]]; then
+                ASEPRITE="$lib/steamapps/common/Aseprite/aseprite"
+                break
+            fi
+        done
+        ASEPRITE=${ASEPRITE:-aseprite}
+    fi
+fi
 
 # Arch/AUR builds can break on cmark patch bumps (libcmark.so.X.Y.Z is
 # version-pinned at link time). Shim the soname locally instead of touching

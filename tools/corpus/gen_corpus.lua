@@ -9,18 +9,17 @@
 
 local out = app.params["out"] or "corpus_out"
 
--- Base backdrop: opaque gradient covering the canvas, plus a transparent
--- left column so every blend mode is also tested against alpha=0 backdrop
--- (the legacy-vs-new blend divergence lives there; see format ref §9.4).
+-- Base backdrop: alpha ramp (transparent / semi / opaque bands) under the
+-- blended cel, so every blend mode is tested against alpha=0, partial and
+-- full backdrop — the legacy-vs-new blend divergence lives in the non-opaque
+-- bands (format ref §9.4).
 local function base_image(w, h)
   local img = Image(w, h, ColorMode.RGB)
   for y = 0, h - 1 do
     for x = 0, w - 1 do
-      if x < 2 then
-        img:putPixel(x, y, app.pixelColor.rgba(0, 0, 0, 0))
-      else
-        img:putPixel(x, y, app.pixelColor.rgba(x * 16, y * 16, 255 - x * 16, 255))
-      end
+      local a
+      if x < 5 then a = 0 elseif x < 10 then a = 128 else a = 255 end
+      img:putPixel(x, y, app.pixelColor.rgba(x * 16, y * 16, 255 - x * 16, a))
     end
   end
   return img
