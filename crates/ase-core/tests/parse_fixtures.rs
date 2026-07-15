@@ -1,11 +1,10 @@
-//! Corpus smoke test: every fixture must header-parse and frame-walk cleanly.
-//! Grows with the parser — once chunk decoding lands, this walks chunks too;
-//! once compositing lands, `generated/*.png` goldens get compared pixel-exact.
+//! Corpus test: every fixture must fully parse — all chunks decoded, all cel
+//! zlib streams inflated. This is the parser's reality check against real
+//! Aseprite output across format eras.
 
 use std::path::PathBuf;
 
-use ase_core::parse::{parse_frame_header, parse_header, HEADER_SIZE};
-use ase_core::read::Reader;
+use ase_core::AseFile;
 
 fn fixture_files() -> Vec<PathBuf> {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
@@ -27,30 +26,31 @@ fn fixture_files() -> Vec<PathBuf> {
 }
 
 #[test]
-fn all_fixtures_header_parse_and_frame_walk() {
+fn all_fixtures_fully_parse() {
     let files = fixture_files();
     assert!(files.len() >= 60, "expected the full corpus, found {} files", files.len());
 
     for path in files {
         let data = std::fs::read(&path).unwrap();
-        let mut r = Reader::new(&data);
-        let header = parse_header(&mut r)
-            .unwrap_or_else(|e| panic!("{}: header: {e}", path.display()));
-        assert!(header.frames > 0, "{}: zero frames", path.display());
+        let file = AseFile::parse(&data)
+            .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
 
-        let mut offset = HEADER_SIZE;
-        for i in 0..header.frames {
-            r.seek(offset)
-                .unwrap_or_else(|e| panic!("{}: frame {i} offset: {e}", path.display()));
-            let fh = parse_frame_header(&mut r)
-                .unwrap_or_else(|e| panic!("{}: frame {i}: {e}", path.display()));
-            offset += fh.frame_bytes as usize;
-        }
-        assert!(
-            offset <= data.len(),
-            "{}: frames overrun file ({offset} > {})",
-            path.display(),
-            data.len()
+        assert_eq!(
+            file.frames.len(),
+            file.header.frames as usize,
+            "{}: frame count mismatch",
+            path.display()
         );
+        assert!(!file.layers.is_empty(), "{}: no layers", path.display());
+        for frame in &file.frames {
+            assert!(frame.duration_ms > 0, "{}: zero frame duration", path.display());
+            for cel in &frame.cels {
+                assert!(
+                    cel.layer_index < file.layers.len(),
+                    "{}: cel layer index out of range",
+                    path.display()
+                );
+            }
+        }
     }
 }
