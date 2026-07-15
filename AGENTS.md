@@ -13,7 +13,6 @@ project exists).
 | [docs/architecture.md](docs/architecture.md) | Crate layout, design rules, verified gdext/ecosystem facts, CI plan. |
 | [docs/feature-list.md](docs/feature-list.md) | What we're building, in priority tiers. |
 
-
 ## Workspace
 
 ```

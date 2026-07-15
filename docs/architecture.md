@@ -52,7 +52,7 @@ aseprite-gd/
 
 Dependency rules: `ase-core` depends on ~nothing (`miniz_oxide` or `flate2` for zlib; no `image`, no `godot`). `aseprite-gd` depends on `ase-core` + `godot`. Anything usable outside Godot lives in `ase-core`; the gdext crate only adapts.
 
-`ase-core` is publishable to crates.io on its own — non-Godot adopters become free correctness QA.
+`ase-core` is publishable to crates.io on its own and usable outside Godot.
 
 ## ase-core design notes
 
