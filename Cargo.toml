@@ -1,0 +1,16 @@
+[workspace]
+resolver = "2"
+members = ["crates/ase-core", "crates/ase-cli", "crates/aseprite-gd"]
+default-members = ["crates/ase-core", "crates/ase-cli"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[workspace.dependencies]
+ase-core = { path = "crates/ase-core" }
+
+[profile.dev.package."*"]
+# gdext codegen is slow unoptimized; keep deps optimized even in dev
+opt-level = 2

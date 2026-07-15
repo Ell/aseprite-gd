@@ -1,0 +1,13 @@
+[package]
+name = "ase-cli"
+description = "Dev tool: inspect .aseprite files and render frames (drives the golden-image suite)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "ase"
+path = "src/main.rs"
+
+[dependencies]
+ase-core.workspace = true

@@ -1,0 +1,9 @@
+[package]
+name = "ase-core"
+description = "Parser and compositor for Aseprite (.aseprite/.ase) files. No engine dependencies."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+miniz_oxide = "0.8"
