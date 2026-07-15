@@ -8,22 +8,7 @@ cd "$(dirname "$0")/../.."
 OUT=crates/ase-core/tests/fixtures/generated
 mkdir -p "$OUT"
 
-# Resolution order: explicit $ASEPRITE, working system binary, Steam build.
-# The Steam build bundles its own deps, so it survives the cmark soname
-# bumps that break the AUR package.
-if [[ -z "${ASEPRITE:-}" ]]; then
-    if command -v aseprite >/dev/null && aseprite -b --version >/dev/null 2>&1; then
-        ASEPRITE=aseprite
-    else
-        for lib in "$HOME/.local/share/Steam" "$HOME/.steam/steam" /mnt/games/SteamLibrary; do
-            if [[ -x "$lib/steamapps/common/Aseprite/aseprite" ]]; then
-                ASEPRITE="$lib/steamapps/common/Aseprite/aseprite"
-                break
-            fi
-        done
-        ASEPRITE=${ASEPRITE:-aseprite}
-    fi
-fi
+ASEPRITE=${ASEPRITE:-aseprite}
 
 # Arch/AUR builds can break on cmark patch bumps (libcmark.so.X.Y.Z is
 # version-pinned at link time). Shim the soname locally instead of touching
@@ -42,3 +27,17 @@ fi
 "$ASEPRITE" -b --script-param out="$OUT" --script tools/corpus/gen_corpus.lua
 echo "$("$ASEPRITE" -b --version 2>/dev/null)" > "$OUT/GENERATED_BY.txt"
 ls "$OUT"/*.aseprite | wc -l
+
+# Golden renders of the VENDORED fixtures too: Aseprite itself flattens every
+# frame, giving the compositor a reference for groups, linked cels, indexed,
+# tilemaps, z-order... Regenerated locally (not taken from upstream repos) so
+# all goldens come from the same Aseprite version.
+GOLD=crates/ase-core/tests/fixtures/goldens
+rm -rf "$GOLD" && mkdir -p "$GOLD"
+for f in crates/ase-core/tests/fixtures/aseprite-tests/*.ase{,prite} \
+         crates/ase-core/tests/fixtures/asefile/*.ase{,prite}; do
+    [[ -e "$f" ]] || continue
+    base=$(basename "$f")
+    "$ASEPRITE" -b "$f" --save-as "$GOLD/${base%.*}@{frame}.png" >/dev/null
+done
+ls "$GOLD" | wc -l

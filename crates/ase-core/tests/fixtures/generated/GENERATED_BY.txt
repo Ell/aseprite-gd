@@ -1,1 +1,1 @@
-Aseprite 1.3.16.1-dev
+Aseprite 1.3.17.2-dev
