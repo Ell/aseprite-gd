@@ -1,90 +1,121 @@
 //! `ase` — development inspector for .aseprite files.
 //!
-//! Usage: ase info <file.aseprite>
-//!
-//! Grows with the parser: `dump-chunks`, `render`, etc. will land here and
-//! drive the golden-image test suite.
+//! Usage:
+//!   ase info <file.aseprite>
+//!   ase render <file.aseprite> <frame> <out.png>
 
 use std::process::ExitCode;
 
-use ase_core::parse::{parse_frame_header, parse_header, FRAME_HEADER_SIZE, HEADER_SIZE};
-use ase_core::read::Reader;
+use ase_core::composite::render_frame;
+use ase_core::AseFile;
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().collect();
     match args.get(1).map(String::as_str) {
         Some("info") if args.len() == 3 => info(&args[2]),
+        Some("render") if args.len() == 5 => render(&args[2], &args[3], &args[4]),
         _ => {
             eprintln!("usage: ase info <file.aseprite>");
+            eprintln!("       ase render <file.aseprite> <frame> <out.png>");
             ExitCode::from(2)
         }
     }
 }
 
+fn parse_file(path: &str) -> Result<AseFile, ExitCode> {
+    let data = std::fs::read(path).map_err(|e| {
+        eprintln!("error: cannot read {path}: {e}");
+        ExitCode::FAILURE
+    })?;
+    AseFile::parse(&data).map_err(|e| {
+        eprintln!("error: {path}: {e}");
+        ExitCode::FAILURE
+    })
+}
+
 fn info(path: &str) -> ExitCode {
-    let data = match std::fs::read(path) {
-        Ok(d) => d,
-        Err(e) => {
-            eprintln!("error: cannot read {path}: {e}");
-            return ExitCode::FAILURE;
+    let file = match parse_file(path) {
+        Ok(f) => f,
+        Err(code) => return code,
+    };
+    let h = &file.header;
+
+    println!("{path}");
+    println!("  canvas:     {}x{} ({:?})", h.width, h.height, h.color_depth);
+    println!("  frames:     {}", file.frames.len());
+    println!("  palette:    {} entries", file.palette.entries.len());
+    println!(
+        "  flags:      layer_opacity={} group_blend={} layer_uuids={}",
+        h.layer_opacity_valid(),
+        h.group_blend_valid(),
+        h.layers_have_uuid()
+    );
+    println!("  layers:");
+    for (i, l) in file.layers.iter().enumerate() {
+        println!(
+            "    [{i}] {}{:?} \"{}\" blend={:?} opacity={}{}{}",
+            "  ".repeat(l.child_level as usize),
+            l.layer_type,
+            l.name,
+            l.blend_mode,
+            l.opacity,
+            if l.is_visible() { "" } else { " (hidden)" },
+            if l.is_background() { " (background)" } else { "" },
+        );
+    }
+    if !file.tags.is_empty() {
+        println!("  tags:");
+        for t in &file.tags {
+            println!(
+                "    \"{}\" frames {}..={} {:?} repeat={}",
+                t.name, t.from_frame, t.to_frame, t.direction, t.repeat
+            );
+        }
+    }
+    for ts in &file.tilesets {
+        println!(
+            "  tileset {}: \"{}\" {} tiles of {}x{}",
+            ts.id, ts.name, ts.num_tiles, ts.tile_width, ts.tile_height
+        );
+    }
+    for (i, f) in file.frames.iter().enumerate() {
+        println!("  frame {i:>3}:  {} cels, {} ms", f.cels.len(), f.duration_ms);
+    }
+    ExitCode::SUCCESS
+}
+
+fn render(path: &str, frame: &str, out: &str) -> ExitCode {
+    let file = match parse_file(path) {
+        Ok(f) => f,
+        Err(code) => return code,
+    };
+    let frame: usize = match frame.parse() {
+        Ok(n) => n,
+        Err(_) => {
+            eprintln!("error: bad frame number {frame:?}");
+            return ExitCode::from(2);
         }
     };
-
-    let mut r = Reader::new(&data);
-    let header = match parse_header(&mut r) {
-        Ok(h) => h,
+    let img = match render_frame(&file, frame) {
+        Ok(i) => i,
         Err(e) => {
             eprintln!("error: {path}: {e}");
             return ExitCode::FAILURE;
         }
     };
 
-    println!("{path}");
-    println!("  canvas:     {}x{} ({:?})", header.width, header.height, header.color_depth);
-    println!("  frames:     {}", header.frames);
-    println!("  colors:     {}", header.num_colors);
-    println!(
-        "  flags:      layer_opacity={} group_blend={} layer_uuids={}",
-        header.layer_opacity_valid(),
-        header.group_blend_valid(),
-        header.layers_have_uuid()
-    );
-    if header.grid_width != 0 {
-        println!(
-            "  grid:       {}x{} at ({}, {})",
-            header.grid_width, header.grid_height, header.grid_x, header.grid_y
-        );
-    }
-
-    // Walk frames by declared sizes (chunk parsing lands later).
-    let mut offset = HEADER_SIZE;
-    for i in 0..header.frames {
-        if r.seek(offset).is_err() {
-            eprintln!("error: frame {i} starts past end of file");
+    let w = match std::fs::File::create(out) {
+        Ok(f) => f,
+        Err(e) => {
+            eprintln!("error: cannot create {out}: {e}");
             return ExitCode::FAILURE;
         }
-        match parse_frame_header(&mut r) {
-            Ok(fh) => {
-                let duration = if fh.duration_ms == 0 {
-                    header.default_frame_duration_ms
-                } else {
-                    fh.duration_ms
-                };
-                println!(
-                    "  frame {i:>3}:  {} chunks, {duration} ms, {} bytes",
-                    fh.num_chunks, fh.frame_bytes
-                );
-                if (fh.frame_bytes as usize) < FRAME_HEADER_SIZE {
-                    eprintln!("error: frame {i} declares impossible size");
-                    return ExitCode::FAILURE;
-                }
-                offset += fh.frame_bytes as usize;
-            }
-            Err(e) => {
-                eprintln!("error: frame {i}: {e}");
-                return ExitCode::FAILURE;
-            }
-        }
-    }
+    };
+    let mut enc = png::Encoder::new(w, img.width, img.height);
+    enc.set_color(png::ColorType::Rgba);
+    enc.set_depth(png::BitDepth::Eight);
+    let mut writer = enc.write_header().unwrap();
+    writer.write_image_data(&img.pixels).unwrap();
+    println!("wrote {out} ({}x{})", img.width, img.height);
     ExitCode::SUCCESS
 }
