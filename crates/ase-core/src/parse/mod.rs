@@ -7,6 +7,7 @@ pub mod frame;
 pub mod header;
 pub mod layer;
 pub mod palette;
+pub mod slice;
 pub mod tags;
 pub mod tileset;
 
@@ -15,6 +16,7 @@ pub use frame::parse_frame_header;
 pub use header::parse_header;
 pub use layer::parse_layer;
 pub use palette::{apply_new_palette, apply_old_palette};
+pub use slice::parse_slice;
 pub use tags::parse_tags;
 pub use tileset::parse_tileset;
 

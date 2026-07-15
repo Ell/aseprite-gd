@@ -43,7 +43,10 @@ fn info(path: &str) -> ExitCode {
     println!("{path}");
     println!("  canvas:     {}x{} ({:?})", h.width, h.height, h.color_depth);
     println!("  frames:     {}", file.frames.len());
-    println!("  palette:    {} entries", file.palette.entries.len());
+    println!(
+        "  palette:    {} entries",
+        file.palettes.last().map_or(0, |p| p.entries.len())
+    );
     println!(
         "  flags:      layer_opacity={} group_blend={} layer_uuids={}",
         h.layer_opacity_valid(),
@@ -76,6 +79,15 @@ fn info(path: &str) -> ExitCode {
         println!(
             "  tileset {}: \"{}\" {} tiles of {}x{}",
             ts.id, ts.name, ts.num_tiles, ts.tile_width, ts.tile_height
+        );
+    }
+    for s in &file.slices {
+        let nine = s.keys.first().is_some_and(|k| k.center.is_some());
+        println!(
+            "  slice \"{}\": {} key(s){}",
+            s.name,
+            s.keys.len(),
+            if nine { ", 9-patch" } else { "" }
         );
     }
     for (i, f) in file.frames.iter().enumerate() {

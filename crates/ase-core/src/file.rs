@@ -1,7 +1,7 @@
 //! Whole-file parsing: assembles the document model by walking frames and
 //! dispatching chunks (§2). Unknown chunk types are skipped (gotcha #23).
 
-use crate::model::{Frame, Header, Layer, Palette, Tag, Tileset};
+use crate::model::{Frame, Header, Layer, Palette, Slice, Tag, Tileset};
 use crate::parse::cel::InflateBudget;
 use crate::parse::chunk::{parse_chunk_header, types};
 use crate::parse::layer::resolve_parent;
@@ -18,8 +18,10 @@ pub struct AseFile {
     pub frames: Vec<Frame>,
     pub tags: Vec<Tag>,
     pub tilesets: Vec<Tileset>,
-    /// Palette state after all palette chunks (per-frame snapshots TODO).
-    pub palette: Palette,
+    pub slices: Vec<Slice>,
+    /// Per-frame palette snapshots — a palette chunk in frame N changes the
+    /// palette from frame N onward (§6.10). Same length as `frames`.
+    pub palettes: Vec<Palette>,
 }
 
 impl AseFile {
@@ -31,6 +33,8 @@ impl AseFile {
         let mut frames: Vec<Frame> = Vec::with_capacity(header.frames as usize);
         let mut tags: Vec<Tag> = Vec::new();
         let mut tilesets: Vec<Tileset> = Vec::new();
+        let mut slices: Vec<Slice> = Vec::new();
+        let mut palettes: Vec<Palette> = Vec::with_capacity(header.frames as usize);
         let mut palette = Palette::default();
         let mut budget = InflateBudget::default();
         // Old palette chunks are ignored once a 0x2019 has been seen (gotcha #10).
@@ -80,8 +84,9 @@ impl AseFile {
                     types::TILESET => {
                         tilesets.push(parse::parse_tileset(&mut r, header.color_depth, &mut budget)?);
                     }
+                    types::SLICE => slices.push(parse::parse_slice(&mut r)?),
                     // Not yet modeled: cel extra, color profile, external
-                    // files, user data, slices. Deprecated: mask, path.
+                    // files, user data. Deprecated: mask, path.
                     _ => {}
                 }
                 r.seek(ch.end())?;
@@ -93,10 +98,16 @@ impl AseFile {
                 fh.duration_ms
             };
             frames.push(Frame { duration_ms, cels });
+            palettes.push(palette.clone());
             frame_start = frame_end;
         }
 
-        Ok(AseFile { header, layers, frames, tags, tilesets, palette })
+        Ok(AseFile { header, layers, frames, tags, tilesets, slices, palettes })
+    }
+
+    /// The palette in effect for a given frame (§6.10).
+    pub fn palette_for(&self, frame: usize) -> &Palette {
+        &self.palettes[frame.min(self.palettes.len().saturating_sub(1))]
     }
 
     /// A layer renders only if it and all ancestors are visible (§6.2).

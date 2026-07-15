@@ -19,6 +19,9 @@ pub fn parse_header(r: &mut Reader) -> Result<Header> {
     }
 
     let frames = r.u16()?;
+    if frames == 0 {
+        return Err(ParseError::Invalid { offset: 6, what: "frame count (zero)" });
+    }
     let width = r.u16()?;
     let height = r.u16()?;
     if width == 0 || height == 0 {

@@ -279,12 +279,39 @@ impl Tileset {
     }
 }
 
-/// RGBA palette entries, straight alpha (§6.10). Currently the state after
-/// applying all palette chunks in file order; per-frame palette snapshots are
-/// a TODO (only matters for indexed sprites with animated palettes).
+/// RGBA palette entries, straight alpha (§6.10).
 #[derive(Debug, Clone, Default)]
 pub struct Palette {
     pub entries: Vec<[u8; 4]>,
+}
+
+/// One slice key: valid from `frame` until the next key (§6.12).
+#[derive(Debug, Clone)]
+pub struct SliceKey {
+    pub frame: u32,
+    /// Slice origin in sprite coords; can be negative.
+    pub x: i32,
+    pub y: i32,
+    /// Zero width/height means the slice is hidden from this frame on.
+    pub width: u32,
+    pub height: u32,
+    /// 9-patch center rect, relative to the slice bounds.
+    pub center: Option<(i32, i32, u32, u32)>,
+    /// Pivot, relative to the slice origin.
+    pub pivot: Option<(i32, i32)>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Slice {
+    pub name: String,
+    pub keys: Vec<SliceKey>,
+}
+
+impl Slice {
+    /// The key in effect at `frame`, if the slice is defined there yet.
+    pub fn key_for(&self, frame: u32) -> Option<&SliceKey> {
+        self.keys.iter().rev().find(|k| k.frame <= frame)
+    }
 }
 
 /// One frame: its duration and cels (§4, §6.3).
