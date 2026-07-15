@@ -1,0 +1,14 @@
+; Demo/test project for aseprite-gd. Opening this in Godot 4.2+ loads the
+; extension from ../target via the .gdextension file in addons/aseprite_gd.
+; Also the target of headless import integration tests in CI.
+
+config_version=5
+
+[application]
+
+config/name="aseprite-gd demo"
+config/features=PackedStringArray("4.2")
+
+[rendering]
+
+textures/canvas_textures/default_texture_filter=0

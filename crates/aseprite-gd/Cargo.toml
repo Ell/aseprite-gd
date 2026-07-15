@@ -1,0 +1,16 @@
+[package]
+name = "aseprite-gd"
+description = "Godot 4 GDExtension: native Aseprite importer (no Aseprite CLI required)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+ase-core.workspace = true
+# experimental-threads is mandatory: the editor calls ResourceFormatLoader
+# methods from background threads (gdext#597). api-4-2 sets the minimum
+# supported Godot version; the extension runs on anything newer.
+godot = { version = "0.5", features = ["api-4-2", "experimental-threads"] }
