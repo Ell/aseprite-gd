@@ -24,6 +24,8 @@ pub struct Trimmed {
 /// Where a unique image landed in the atlas.
 #[derive(Debug, Clone, Copy)]
 pub struct Placement {
+    /// Which page of the atlas holds this image.
+    pub page: usize,
     pub x: u32,
     pub y: u32,
     pub width: u32,
@@ -32,11 +34,17 @@ pub struct Placement {
     pub offset_y: u32,
 }
 
-pub struct Atlas {
+/// One texture page. Pages stay under the dimension cap passed to [`pack`]
+/// (Godot rejects textures above 16384px).
+pub struct AtlasPage {
     pub width: u32,
     pub height: u32,
-    /// RGBA8 atlas pixels, row-major.
+    /// RGBA8 pixels, row-major.
     pub pixels: Vec<u8>,
+}
+
+pub struct Atlas {
+    pub pages: Vec<AtlasPage>,
     /// One placement per unique image.
     pub placements: Vec<Placement>,
     /// Maps each input frame to its placement index.
@@ -82,9 +90,10 @@ fn trim(img: &RgbaImage) -> Trimmed {
     }
 }
 
-/// Packs frames into a single atlas. `padding` pixels of transparent space
-/// separate placements (bleed protection when filtering).
-pub fn pack(frames: &[RgbaImage], padding: u32) -> Atlas {
+/// Packs frames into atlas pages no larger than `max_dim` on either side.
+/// `padding` pixels of transparent space separate placements (bleed
+/// protection when filtering).
+pub fn pack(frames: &[RgbaImage], padding: u32, max_dim: u32) -> Atlas {
     // Dedup identical trimmed frames, preserving first-seen order for
     // determinism.
     let mut unique: Vec<Trimmed> = Vec::new();
@@ -109,8 +118,8 @@ pub fn pack(frames: &[RgbaImage], padding: u32) -> Atlas {
         )
     });
 
-    // Atlas width: roughly square by total area, rounded up to a multiple of
-    // 4, at least as wide as the widest image.
+    // Page width: roughly square by total area, rounded up to a multiple of
+    // 4, at least as wide as the widest image, capped at max_dim.
     let total_area: u64 = unique
         .iter()
         .map(|t| (t.width + padding) as u64 * (t.height + padding) as u64)
@@ -118,10 +127,12 @@ pub fn pack(frames: &[RgbaImage], padding: u32) -> Atlas {
     let max_w = unique.iter().map(|t| t.width).max().unwrap_or(1) + padding;
     let atlas_w = ((total_area as f64).sqrt().ceil() as u32)
         .next_multiple_of(4)
-        .max(max_w);
+        .max(max_w)
+        .min(max_dim);
 
     let mut placements = vec![
         Placement {
+            page: 0,
             x: 0,
             y: 0,
             width: 0,
@@ -131,8 +142,10 @@ pub fn pack(frames: &[RgbaImage], padding: u32) -> Atlas {
         };
         unique.len()
     ];
-    let (mut cur_x, mut cur_y, mut shelf_h, mut used_w, mut atlas_h) =
-        (0u32, 0u32, 0u32, 0u32, 0u32);
+    // Shelf-fill pages; a shelf that would push past max_dim vertically
+    // starts a new page.
+    let mut page_dims: Vec<(u32, u32)> = vec![(0, 0)]; // (used_w, used_h) per page
+    let (mut page, mut cur_x, mut cur_y, mut shelf_h) = (0usize, 0u32, 0u32, 0u32);
     for &i in &order {
         let t = &unique[i];
         if cur_x + t.width > atlas_w {
@@ -140,7 +153,15 @@ pub fn pack(frames: &[RgbaImage], padding: u32) -> Atlas {
             cur_x = 0;
             shelf_h = 0;
         }
+        if cur_y + t.height > max_dim {
+            page += 1;
+            page_dims.push((0, 0));
+            cur_x = 0;
+            cur_y = 0;
+            shelf_h = 0;
+        }
         placements[i] = Placement {
+            page,
             x: cur_x,
             y: cur_y,
             width: t.width,
@@ -150,26 +171,35 @@ pub fn pack(frames: &[RgbaImage], padding: u32) -> Atlas {
         };
         cur_x += t.width + padding;
         shelf_h = shelf_h.max(t.height + padding);
-        used_w = used_w.max(cur_x);
-        atlas_h = atlas_h.max(cur_y + t.height);
+        let d = &mut page_dims[page];
+        d.0 = d.0.max(cur_x);
+        d.1 = d.1.max(cur_y + t.height);
     }
 
-    let width = used_w.saturating_sub(padding).max(1);
-    let height = atlas_h.max(1);
-    let mut pixels = vec![0u8; width as usize * height as usize * 4];
+    let mut pages: Vec<AtlasPage> = page_dims
+        .iter()
+        .map(|&(w, h)| {
+            let width = w.saturating_sub(padding).max(1);
+            let height = h.max(1);
+            AtlasPage {
+                width,
+                height,
+                pixels: vec![0u8; width as usize * height as usize * 4],
+            }
+        })
+        .collect();
     for (i, t) in unique.iter().enumerate() {
         let p = &placements[i];
+        let pg = &mut pages[p.page];
         for row in 0..t.height as usize {
             let src = &t.pixels[row * t.width as usize * 4..][..t.width as usize * 4];
-            let dst = ((p.y as usize + row) * width as usize + p.x as usize) * 4;
-            pixels[dst..dst + src.len()].copy_from_slice(src);
+            let dst = ((p.y as usize + row) * pg.width as usize + p.x as usize) * 4;
+            pg.pixels[dst..dst + src.len()].copy_from_slice(src);
         }
     }
 
     Atlas {
-        width,
-        height,
-        pixels,
+        pages,
         placements,
         frame_to_placement,
     }
@@ -214,7 +244,7 @@ mod tests {
             img(16, 16, (2, 2, 4, 4)),
             img(16, 16, (8, 8, 2, 2)),
         ];
-        let atlas = pack(&frames, 1);
+        let atlas = pack(&frames, 1, 16384);
         assert_eq!(atlas.placements.len(), 2, "two unique images");
         assert_eq!(atlas.frame_to_placement, vec![0, 0, 1]);
     }
@@ -222,14 +252,15 @@ mod tests {
     #[test]
     fn packing_is_deterministic_and_lossless() {
         let frames: Vec<RgbaImage> = (0..6).map(|i| img(32, 32, (i, i, 5 + i, 3 + i))).collect();
-        let a = pack(&frames, 1);
-        let b = pack(&frames, 1);
-        assert_eq!(a.pixels, b.pixels);
-        assert_eq!(a.width, b.width);
+        let a = pack(&frames, 1, 16384);
+        let b = pack(&frames, 1, 16384);
+        assert_eq!(a.pages[0].pixels, b.pages[0].pixels);
+        assert_eq!(a.pages[0].width, b.pages[0].width);
         // Every placement's pixels must match its trimmed source.
         for (f, &pi) in a.frame_to_placement.iter().enumerate() {
             let p = &a.placements[pi];
             let t = trim(&frames[f]);
+            let a = &a.pages[p.page];
             for row in 0..p.height as usize {
                 let atlas_row = &a.pixels
                     [((p.y as usize + row) * a.width as usize + p.x as usize) * 4..]
@@ -237,6 +268,29 @@ mod tests {
                 let src_row = &t.pixels[row * t.width as usize * 4..][..t.width as usize * 4];
                 assert_eq!(atlas_row, src_row);
             }
+        }
+    }
+
+    #[test]
+    fn splits_pages_at_dimension_cap() {
+        // Six 10x10 solid frames, max_dim 24: pages hold at most 2 columns x
+        // 2 shelves = 4 tiles, so 6 distinct frames need 2 pages.
+        let frames: Vec<RgbaImage> = (0..6)
+            .map(|i| {
+                let mut f = img(10, 10, (0, 0, 10, 10));
+                f.pixels[0] = i as u8; // make each frame unique
+                f
+            })
+            .collect();
+        let atlas = pack(&frames, 1, 24);
+        assert!(atlas.pages.len() > 1, "expected a page split");
+        for page in &atlas.pages {
+            assert!(page.width <= 24 && page.height <= 24);
+        }
+        // Every frame still maps to a valid placement on some page.
+        for &pi in &atlas.frame_to_placement {
+            let p = &atlas.placements[pi];
+            assert!(p.page < atlas.pages.len());
         }
     }
 }

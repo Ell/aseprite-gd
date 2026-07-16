@@ -137,19 +137,27 @@ pub fn frame_atlas_textures(file: &AseFile) -> Result<Vec<Gd<AtlasTexture>>, Str
     let rendered: Vec<_> = (0..file.frames.len())
         .map(|i| render_frame(file, i).map_err(|e| e.to_string()))
         .collect::<Result<_, _>>()?;
-    let atlas = crate::atlas::pack(&rendered, 1);
+    // Godot rejects textures above 16384px on a side; the packer splits
+    // pages under that cap.
+    let atlas = crate::atlas::pack(&rendered, 1, 16384);
 
-    let data = PackedByteArray::from(atlas.pixels.as_slice());
-    let image = Image::create_from_data(
-        atlas.width as i32,
-        atlas.height as i32,
-        false,
-        Format::RGBA8,
-        &data,
-    )
-    .ok_or("atlas Image::create_from_data failed")?;
-    let sheet = ImageTexture::create_from_image(&image)
-        .ok_or("atlas ImageTexture::create_from_image failed")?;
+    let sheets: Vec<Gd<ImageTexture>> = atlas
+        .pages
+        .iter()
+        .map(|page| {
+            let data = PackedByteArray::from(page.pixels.as_slice());
+            let image = Image::create_from_data(
+                page.width as i32,
+                page.height as i32,
+                false,
+                Format::RGBA8,
+                &data,
+            )
+            .ok_or("atlas Image::create_from_data failed")?;
+            ImageTexture::create_from_image(&image)
+                .ok_or("atlas ImageTexture::create_from_image failed".to_string())
+        })
+        .collect::<Result<_, _>>()?;
 
     let (cw, ch) = (file.header.width as f32, file.header.height as f32);
     let textures = file
@@ -159,7 +167,7 @@ pub fn frame_atlas_textures(file: &AseFile) -> Result<Vec<Gd<AtlasTexture>>, Str
         .map(|(i, _)| {
             let p = &atlas.placements[atlas.frame_to_placement[i]];
             let mut tex = AtlasTexture::new_gd();
-            tex.set_atlas(&sheet);
+            tex.set_atlas(&sheets[p.page]);
             tex.set_region(Rect2::new(
                 Vector2::new(p.x as f32, p.y as f32),
                 Vector2::new(p.width as f32, p.height as f32),
