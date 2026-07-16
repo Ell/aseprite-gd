@@ -92,3 +92,25 @@ fn tag_repeat_counts_survive() {
     let reps: Vec<u16> = f.tags.iter().map(|t| t.repeat).collect();
     assert_eq!(reps, vec![1, 1, 2]);
 }
+
+#[test]
+fn per_tile_user_data_attaches_from_generated_fixture() {
+    let f = load("generated/tile_flips.aseprite");
+    let ts = &f.tilesets[0];
+    assert!(ts.zero_is_empty());
+    assert_eq!(ts.num_tiles, 2, "empty tile + one real tile");
+    assert_eq!(ts.tile_user_data.len(), 2);
+    assert_eq!(ts.tile_user_data[1].text.as_deref(), Some("solid"));
+}
+
+#[test]
+fn slice_fixture_parses_center_pivot_and_user_data() {
+    let f = load("generated/slices.aseprite");
+    let panel = f.slices.iter().find(|s| s.name == "panel").unwrap();
+    let key = panel.key_for(0).unwrap();
+    assert_eq!((key.x, key.y, key.width, key.height), (4, 4, 24, 16));
+    assert_eq!(key.center, Some((8, 8, 8, 4)));
+    assert_eq!(key.pivot, Some((2, 3)));
+    assert_eq!(panel.user_data.text.as_deref(), Some("nine"));
+    assert!(f.slices.iter().any(|s| s.name == "hitbox"));
+}

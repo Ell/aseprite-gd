@@ -109,7 +109,7 @@ fn generated_fixtures_render_pixel_identical_to_aseprite() {
         }
         checked += 1;
     }
-    assert_eq!(checked, 22, "expected 19 blend-mode + 3 feature goldens");
+    assert_eq!(checked, 23, "expected 19 blend-mode + 4 feature goldens");
 }
 
 #[test]

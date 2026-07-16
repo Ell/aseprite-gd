@@ -150,6 +150,7 @@ do
     end
   end
   tile.image = timg
+  tile.data = "solid" -- per-tile user data (§6.11 tileset association)
 
   local grid = Image(2, 2, ColorMode.TILEMAP)
   grid:putPixel(0, 0, 1) -- plain
@@ -160,6 +161,27 @@ do
 
   spr:saveAs(out .. "/tile_flips.aseprite")
   spr:saveCopyAs(out .. "/tile_flips.png")
+  spr:close()
+end
+
+-- Slices: a 9-patch slice with center+pivot+user data, and a plain slice
+-- (§6.12). The golden is trivial (slices don't affect rendering) but the
+-- fixture feeds slice/user-data parse tests and the StyleBox importer.
+do
+  local spr = Sprite(32, 32, ColorMode.RGB)
+  spr.cels[1].image:drawImage(base_image(32, 32))
+
+  local nine = spr:newSlice(Rectangle(4, 4, 24, 16))
+  nine.name = "panel"
+  nine.center = Rectangle(8, 8, 8, 4)
+  nine.pivot = Point(2, 3)
+  nine.data = "nine"
+
+  local hit = spr:newSlice(Rectangle(0, 20, 8, 8))
+  hit.name = "hitbox"
+
+  spr:saveAs(out .. "/slices.aseprite")
+  spr:saveCopyAs(out .. "/slices.png")
   spr:close()
 end
 
