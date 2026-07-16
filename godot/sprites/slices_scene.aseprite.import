@@ -19,3 +19,5 @@ post_import_script="res://hooks/add_slice_hitboxes.gd"
 autoplay=true
 atlas_padding=1
 atlas_extrude=false
+scale=1
+compress_mode=0

@@ -22,3 +22,6 @@ split_layers=false
 slice_tracks=false
 atlas_padding=1
 atlas_extrude=false
+scale=1
+compress_mode=0
+snap_to_fps=0.0

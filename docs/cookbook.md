@@ -38,6 +38,13 @@ AnimationLibrary importer instead, `split_layers` puts one texture track per
 layer into each animation (targeting `<sprite_path>/<layer>:texture`), so a
 single AnimationPlayer animation drives every layer in sync.
 
+## Importing into an existing AnimationPlayer
+
+Select the AnimationPlayer and use the Inspector's "Aseprite Import" section
+(see [editor-tools.md](editor-tools.md)): animations merge into its library
+without disturbing hand-made tracks or animations, and "Reimport last"
+repeats the import after the art changes.
+
 ## Tilemaps
 
 Quick path: switch the file to *TileSet (Aseprite)* and use the imported

@@ -19,3 +19,6 @@ post_import_script="res://hooks/tag_metadata.gd"
 split_layers=false
 atlas_padding=1
 atlas_extrude=false
+scale=1
+compress_mode=0
+snap_to_fps=0.0

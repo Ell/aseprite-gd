@@ -39,7 +39,7 @@ fn remove_claimed_tracks(anim: &mut Gd<Animation>, generated: &Gd<Animation>) {
         .collect();
     for t in (0..anim.get_track_count()).rev() {
         let path = anim.track_get_path(t);
-        if claimed.iter().any(|c| *c == path) {
+        if claimed.contains(&path) {
             anim.remove_track(t);
         }
     }
