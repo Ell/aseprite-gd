@@ -19,6 +19,11 @@ use godot::prelude::*;
 pub struct AtlasParams {
     pub padding: u32,
     pub extrude: bool,
+    /// Integer nearest-neighbor upscale applied to rendered frames (1-8).
+    pub scale: u32,
+    /// 0 = embedded ImageTexture (lossless), 1 = PortableCompressedTexture2D
+    /// lossless, 2 = PortableCompressedTexture2D lossy.
+    pub compress: i64,
 }
 
 impl AtlasParams {
@@ -32,6 +37,14 @@ impl AtlasParams {
                 .get(&"atlas_extrude".to_variant())
                 .map(|v| v.booleanize())
                 .unwrap_or(false),
+            scale: options
+                .get(&"scale".to_variant())
+                .map(|v| v.to::<i64>().clamp(1, 8) as u32)
+                .unwrap_or(1),
+            compress: options
+                .get(&"compress_mode".to_variant())
+                .map(|v| v.to::<i64>().clamp(0, 2))
+                .unwrap_or(0),
         }
     }
 }
@@ -41,6 +54,8 @@ impl Default for AtlasParams {
         AtlasParams {
             padding: 1,
             extrude: false,
+            scale: 1,
+            compress: 0,
         }
     }
 }
@@ -55,6 +70,9 @@ pub struct ConvertOptions {
     pub exclude_tags: String,
     /// Render layers that are hidden in Aseprite too.
     pub include_hidden_layers: bool,
+    /// When > 0, re-time frame durations to the nearest tick of this frame
+    /// rate (minimum one tick). Exact millisecond timing is the default.
+    pub snap_to_fps: f64,
 }
 
 impl ConvertOptions {
@@ -72,6 +90,10 @@ impl ConvertOptions {
                 .get(&"include_hidden_layers".to_variant())
                 .map(|v| v.booleanize())
                 .unwrap_or(false),
+            snap_to_fps: options
+                .get(&"snap_to_fps".to_variant())
+                .map(|v| v.to::<f64>())
+                .unwrap_or(0.0),
         }
     }
 
@@ -92,6 +114,13 @@ impl ConvertOptions {
                 layer.flags &= !1;
             }
         }
+        if self.snap_to_fps > 0.0 {
+            let tick = 1000.0 / self.snap_to_fps;
+            for frame in &mut file.frames {
+                let snapped = (frame.duration_ms as f64 / tick).round().max(1.0) * tick;
+                frame.duration_ms = snapped.round().clamp(1.0, u16::MAX as f64) as u16;
+            }
+        }
         file.tags.retain(|t| {
             !self
                 .exclude_tags
@@ -101,6 +130,58 @@ impl ConvertOptions {
                 .any(|p| t.name.contains(p))
         });
         file
+    }
+}
+
+/// Integer nearest-neighbor upscale.
+pub fn scale_rgba(img: &ase_core::composite::RgbaImage, n: u32) -> ase_core::composite::RgbaImage {
+    if n <= 1 {
+        return ase_core::composite::RgbaImage {
+            width: img.width,
+            height: img.height,
+            pixels: img.pixels.clone(),
+        };
+    }
+    let n = n as usize;
+    let (w, h) = (img.width as usize, img.height as usize);
+    let mut pixels = vec![0u8; w * n * h * n * 4];
+    for y in 0..h {
+        for x in 0..w {
+            let src = &img.pixels[(y * w + x) * 4..][..4];
+            for dy in 0..n {
+                for dx in 0..n {
+                    let d = (((y * n + dy) * w * n) + x * n + dx) * 4;
+                    pixels[d..d + 4].copy_from_slice(src);
+                }
+            }
+        }
+    }
+    ase_core::composite::RgbaImage {
+        width: img.width * n as u32,
+        height: img.height * n as u32,
+        pixels,
+    }
+}
+
+/// Wraps an Image per the compression mode: 0 embedded lossless ImageTexture,
+/// 1 PortableCompressedTexture2D lossless, 2 lossy.
+pub fn make_texture(image: &Gd<Image>, compress: i64) -> Result<Gd<Texture2D>, String> {
+    use godot::classes::PortableCompressedTexture2D;
+    use godot::classes::portable_compressed_texture_2d::CompressionMode;
+    match compress {
+        1 | 2 => {
+            let mut t = PortableCompressedTexture2D::new_gd();
+            let mode = if compress == 1 {
+                CompressionMode::LOSSLESS
+            } else {
+                CompressionMode::LOSSY
+            };
+            t.create_from_image(image, mode);
+            Ok(t.upcast::<Texture2D>())
+        }
+        _ => ImageTexture::create_from_image(image)
+            .map(|t| t.upcast::<Texture2D>())
+            .ok_or_else(|| "ImageTexture::create_from_image failed".to_string()),
     }
 }
 
@@ -191,13 +272,17 @@ pub fn frame_atlas_textures(
     atlas_params: AtlasParams,
 ) -> Result<Vec<Gd<AtlasTexture>>, String> {
     let rendered: Vec<_> = (0..file.frames.len())
-        .map(|i| render_frame(file, i).map_err(|e| e.to_string()))
+        .map(|i| {
+            render_frame(file, i)
+                .map(|r| scale_rgba(&r, atlas_params.scale))
+                .map_err(|e| e.to_string())
+        })
         .collect::<Result<_, _>>()?;
     // Godot rejects textures above 16384px on a side; the packer splits
     // pages under that cap.
     let atlas = crate::atlas::pack(&rendered, atlas_params.padding, 16384, atlas_params.extrude);
 
-    let sheets: Vec<Gd<ImageTexture>> = atlas
+    let sheets: Vec<Gd<Texture2D>> = atlas
         .pages
         .iter()
         .map(|page| {
@@ -210,12 +295,12 @@ pub fn frame_atlas_textures(
                 &data,
             )
             .ok_or("atlas Image::create_from_data failed")?;
-            ImageTexture::create_from_image(&image)
-                .ok_or("atlas ImageTexture::create_from_image failed".to_string())
+            make_texture(&image, atlas_params.compress)
         })
         .collect::<Result<_, _>>()?;
 
-    let (cw, ch) = (file.header.width as f32, file.header.height as f32);
+    let k = atlas_params.scale as f32;
+    let (cw, ch) = (file.header.width as f32 * k, file.header.height as f32 * k);
     let textures = file
         .frames
         .iter()
@@ -620,11 +705,11 @@ pub fn build_tileset(file: &AseFile) -> Result<Gd<TileSet>, String> {
 }
 
 /// Renders `frame` and crops it to a slice key's rect (clamped to canvas).
-fn slice_texture(
+fn slice_image(
     file: &AseFile,
     frame: usize,
     key: &ase_core::model::SliceKey,
-) -> Result<Gd<ImageTexture>, String> {
+) -> Result<Gd<Image>, String> {
     let rendered = render_frame(file, frame).map_err(|e| e.to_string())?;
     let (cw, ch) = (rendered.width as i64, rendered.height as i64);
     let x0 = (key.x as i64).clamp(0, cw);
@@ -641,17 +726,16 @@ fn slice_texture(
         pixels.extend_from_slice(&rendered.pixels[row..row + w * 4]);
     }
     let data = PackedByteArray::from(pixels.as_slice());
-    let image = Image::create_from_data(w as i32, h as i32, false, Format::RGBA8, &data)
-        .ok_or("slice Image::create_from_data failed")?;
-    ImageTexture::create_from_image(&image).ok_or("slice ImageTexture failed".to_string())
+    Image::create_from_data(w as i32, h as i32, false, Format::RGBA8, &data)
+        .ok_or("slice Image::create_from_data failed".to_string())
 }
 
-/// A frame texture cropped to a named slice.
-pub fn texture_for_frame_slice(
+/// A frame image cropped to a named slice.
+pub fn image_for_frame_slice(
     file: &AseFile,
     frame: usize,
     slice_name: &str,
-) -> Result<Gd<ImageTexture>, String> {
+) -> Result<Gd<Image>, String> {
     let slice = file
         .slices
         .iter()
@@ -663,7 +747,7 @@ pub fn texture_for_frame_slice(
     if key.width == 0 || key.height == 0 {
         return Err("slice is hidden at this frame".to_string());
     }
-    slice_texture(file, frame, key)
+    slice_image(file, frame, key)
 }
 
 /// Builds a StyleBoxTexture from a 9-patch slice (§6.12): the slice rect is
@@ -695,7 +779,9 @@ pub fn build_stylebox(
         return Err("slice is hidden at this frame".to_string());
     }
 
-    let texture = slice_texture(file, frame, key)?;
+    let image = slice_image(file, frame, key)?;
+    let texture =
+        ImageTexture::create_from_image(&image).ok_or("slice ImageTexture failed".to_string())?;
 
     let mut sb = StyleBoxTexture::new_gd();
     sb.set_texture(&texture.upcast::<Texture2D>());
@@ -847,12 +933,13 @@ pub fn split_atlas_textures(
     for (idx, _) in &units {
         let isolated = isolate_layer(file, *idx);
         for f in 0..frame_count {
-            renders.push(render_frame(&isolated, f).map_err(|e| e.to_string())?);
+            let r = render_frame(&isolated, f).map_err(|e| e.to_string())?;
+            renders.push(scale_rgba(&r, atlas_params.scale));
         }
     }
     let atlas = crate::atlas::pack(&renders, atlas_params.padding, 16384, atlas_params.extrude);
 
-    let sheets: Vec<Gd<ImageTexture>> = atlas
+    let sheets: Vec<Gd<Texture2D>> = atlas
         .pages
         .iter()
         .map(|page| {
@@ -865,12 +952,12 @@ pub fn split_atlas_textures(
                 &data,
             )
             .ok_or("atlas Image::create_from_data failed")?;
-            ImageTexture::create_from_image(&image)
-                .ok_or("atlas ImageTexture::create_from_image failed".to_string())
+            make_texture(&image, atlas_params.compress)
         })
         .collect::<Result<_, _>>()?;
 
-    let (cw, ch) = (file.header.width as f32, file.header.height as f32);
+    let k = atlas_params.scale as f32;
+    let (cw, ch) = (file.header.width as f32 * k, file.header.height as f32 * k);
     let mut out = Vec::with_capacity(units.len());
     for (u, (_, name)) in units.iter().enumerate() {
         let textures = (0..frame_count)
@@ -942,6 +1029,7 @@ mod tests {
             exclude_layers: "inner_normal, inner_addition".to_string(),
             exclude_tags: String::new(),
             include_hidden_layers: false,
+            snap_to_fps: 0.0,
         };
         let out = opts.apply(&file);
         let vis: Vec<(&str, bool)> = out
@@ -964,6 +1052,7 @@ mod tests {
             exclude_layers: "addition".into(),
             exclude_tags: String::new(),
             include_hidden_layers: false,
+            snap_to_fps: 0.0,
         }
         .apply(&file);
         assert!(one.layers[2].is_visible() && !one.layers[3].is_visible());
@@ -971,6 +1060,7 @@ mod tests {
             exclude_layers: "".into(),
             exclude_tags: String::new(),
             include_hidden_layers: false,
+            snap_to_fps: 0.0,
         }
         .apply(&file);
         assert!(none.layers.iter().all(|l| l.is_visible()));

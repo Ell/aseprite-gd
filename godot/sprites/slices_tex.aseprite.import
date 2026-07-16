@@ -18,3 +18,5 @@ include_hidden_layers=false
 post_import_script=""
 frame=0
 slice="panel"
+scale=2
+compress_mode=1

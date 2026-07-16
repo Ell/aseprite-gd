@@ -37,6 +37,21 @@ pub fn common_options() -> Array<AnyDictionary> {
     a
 }
 
+/// A plain name/default option.
+pub fn option_pair(name: &str, default: impl ToGodot) -> AnyDictionary {
+    option(name, default.to_variant())
+}
+
+/// An enum-hinted option (`PROPERTY_HINT_ENUM` = 2).
+pub fn enum_option(name: &str, default: i64, choices: &str) -> AnyDictionary {
+    let mut d = VarDictionary::new();
+    d.set(&"name".to_variant(), &name.to_variant());
+    d.set(&"default_value".to_variant(), &default.to_variant());
+    d.set(&"property_hint".to_variant(), &2i64.to_variant());
+    d.set(&"hint_string".to_variant(), &choices.to_variant());
+    d.upcast_any_dictionary()
+}
+
 /// The `post_import_script` option with a file-picker hint.
 fn script_option() -> AnyDictionary {
     let mut d = VarDictionary::new();

@@ -96,6 +96,12 @@ impl IEditorImportPlugin for AseSceneImporter {
         extrude.set(&"name".to_variant(), &"atlas_extrude".to_variant());
         extrude.set(&"default_value".to_variant(), &false.to_variant());
         opts.push(extrude.upcast_any_dictionary());
+        opts.push(import::option_pair("scale", 1i64));
+        opts.push(import::enum_option(
+            "compress_mode",
+            0,
+            "Lossless,Portable Lossless,Portable Lossy",
+        ));
         opts
     }
 

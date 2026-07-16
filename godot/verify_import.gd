@@ -145,7 +145,7 @@ func _init():
     var reset_ok = lib2 is AnimationLibrary and lib2.has_animation("RESET") \
         and lib2.get_animation("RESET").get_track_count() == 1
     var stex = load("res://sprites/slices_tex.aseprite")
-    var stex_ok = stex is Texture2D and stex.get_size() == Vector2(24, 16)
+    var stex_ok = stex is PortableCompressedTexture2D and stex.get_size() == Vector2(48, 32)
     var opts_ok = reset_ok and stex_ok
     print("option_features: reset=", reset_ok, " slice_tex=", stex_ok)
 

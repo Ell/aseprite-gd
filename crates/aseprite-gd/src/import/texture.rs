@@ -73,6 +73,12 @@ impl IEditorImportPlugin for AseTextureImporter {
         slice.set(&"name".to_variant(), &"slice".to_variant());
         slice.set(&"default_value".to_variant(), &"".to_variant());
         opts.push(slice.upcast_any_dictionary());
+        opts.push(import::option_pair("scale", 1i64));
+        opts.push(import::enum_option(
+            "compress_mode",
+            0,
+            "Lossless,Portable Lossless,Portable Lossy",
+        ));
         opts
     }
 
@@ -102,11 +108,33 @@ impl IEditorImportPlugin for AseTextureImporter {
             .get(&"slice".to_variant())
             .map(|v| v.to_string())
             .unwrap_or_default();
-        let texture = match if slice.trim().is_empty() {
-            convert::texture_for_frame(&file, frame)
+        let mut image = match if slice.trim().is_empty() {
+            convert::frame_to_image(&file, frame)
         } else {
-            convert::texture_for_frame_slice(&file, frame, slice.trim())
+            convert::image_for_frame_slice(&file, frame, slice.trim())
         } {
+            Ok(i) => i,
+            Err(e) => {
+                godot_error!("aseprite-gd: {source_file}: {e}");
+                return Error::ERR_CANT_CREATE;
+            }
+        };
+        let scale = options
+            .get(&"scale".to_variant())
+            .map(|v| v.to::<i64>().clamp(1, 8))
+            .unwrap_or(1) as i32;
+        if scale > 1 {
+            let (w, h) = (image.get_width() * scale, image.get_height() * scale);
+            image
+                .resize_ex(w, h)
+                .interpolation(godot::classes::image::Interpolation::NEAREST)
+                .done();
+        }
+        let compress = options
+            .get(&"compress_mode".to_variant())
+            .map(|v| v.to::<i64>().clamp(0, 2))
+            .unwrap_or(0);
+        let texture = match convert::make_texture(&image, compress) {
             Ok(t) => t,
             Err(e) => {
                 godot_error!("aseprite-gd: {source_file}: {e}");
