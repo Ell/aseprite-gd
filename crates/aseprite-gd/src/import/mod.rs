@@ -4,6 +4,7 @@
 //! Note (godot#104519): `get_priority`/`get_import_order` must be implemented
 //! explicitly — engine defaults are unreliable for GDExtension importers.
 
+pub mod animation_library;
 pub mod sprite_frames;
 pub mod texture;
 
