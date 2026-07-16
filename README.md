@@ -56,8 +56,10 @@ Working example scenes live in [godot/examples/](godot/examples/).
 ## Development
 
 ```sh
-cargo test                    # core tests
-cargo build -p aseprite-gd    # build the extension
+make test      # core tests
+make editor    # build and open the demo project in the Godot editor
+make verify    # headless import + resource verification
+make           # list all targets
 ```
 
 See [AGENTS.md](AGENTS.md) for contributor/agent guidelines and

@@ -29,12 +29,15 @@ takes minutes: build it explicitly with `cargo build -p aseprite-gd`.
 ## Commands
 
 ```sh
-cargo test                          # ase-core unit tests — the tight loop
-cargo build -p aseprite-gd          # build the GDExtension (slow first time)
-cargo run -p ase-cli -- info FILE   # inspect an .aseprite file
-cargo clippy --workspace --all-targets -- -D warnings
-cargo fmt --all
+make test        # fast Rust tests — the tight loop
+make check       # fmt + clippy + tests (CI lint parity)
+make verify      # headless import + resource verification of the demo project
+make editor      # build and open the demo project in the Godot editor
+make             # list all targets
 ```
+
+(`cargo test`, `cargo build -p aseprite-gd`, and
+`cargo run -p ase-cli -- info FILE` work directly too.)
 
 Integration check (requires a `godot` binary, 4.2+):
 
