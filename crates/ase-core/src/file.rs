@@ -1,6 +1,7 @@
 //! Whole-file parsing: assembles the document model by walking frames and
 //! dispatching chunks (§2). Unknown chunk types are skipped (gotcha #23).
 
+use crate::Result;
 use crate::model::{
     ColorProfile, ExternalFile, Frame, Header, Layer, Palette, Slice, Tag, Tileset, UserData,
 };
@@ -9,7 +10,6 @@ use crate::parse::chunk::{parse_chunk_header, types};
 use crate::parse::layer::resolve_parent;
 use crate::parse::{self, HEADER_SIZE};
 use crate::read::Reader;
-use crate::Result;
 
 /// A fully parsed Aseprite document.
 #[derive(Debug, Clone)]
@@ -40,9 +40,15 @@ enum UdTarget {
     Cel(usize),
     Slice(usize),
     /// Next tag index to receive user data, and the end of the tag run.
-    Tags { next: usize, end: usize },
+    Tags {
+        next: usize,
+        end: usize,
+    },
     /// Tileset itself first, then per-tile user data in tile order.
-    Tileset { index: usize, next_tile: Option<usize> },
+    Tileset {
+        index: usize,
+        next_tile: Option<usize>,
+    },
     /// Preceding object was skipped/invalid: drop user data.
     None,
 }
@@ -75,6 +81,13 @@ impl AseFile {
             let frame_end = frame_start + fh.frame_bytes as usize;
             let mut cels = Vec::new();
             let mut last_cel: Option<usize> = None;
+            // `cels` is frame-local but `ud_target` persists across frames: a
+            // cel target left over from the previous frame would index into
+            // the new (empty) vec. Cel user data only ever follows its cel
+            // within the same frame (§6.11), so drop the stale target.
+            if matches!(ud_target, UdTarget::Cel(_)) {
+                ud_target = UdTarget::None;
+            }
 
             for _ in 0..fh.num_chunks {
                 let ch = parse_chunk_header(&mut r, frame_end)?;
@@ -118,8 +131,17 @@ impl AseFile {
                         let start = tags.len();
                         tags.extend(parse::parse_tags(&mut r)?);
                         // The next N user data chunks belong to these tags in
-                        // order (§6.11).
-                        ud_target = UdTarget::Tags { next: start, end: tags.len() };
+                        // order (§6.11). An empty tag run must not create a
+                        // target, or the first user data chunk would index
+                        // `tags[start]` out of bounds.
+                        ud_target = if start < tags.len() {
+                            UdTarget::Tags {
+                                next: start,
+                                end: tags.len(),
+                            }
+                        } else {
+                            UdTarget::None
+                        };
                     }
                     types::PALETTE => {
                         seen_new_palette = true;
@@ -132,15 +154,23 @@ impl AseFile {
                         parse::apply_old_palette(&mut r, &mut palette, true)?;
                     }
                     types::TILESET => {
-                        tilesets.push(parse::parse_tileset(&mut r, header.color_depth, &mut budget)?);
-                        ud_target =
-                            UdTarget::Tileset { index: tilesets.len() - 1, next_tile: None };
+                        tilesets.push(parse::parse_tileset(
+                            &mut r,
+                            header.color_depth,
+                            &mut budget,
+                        )?);
+                        ud_target = UdTarget::Tileset {
+                            index: tilesets.len() - 1,
+                            next_tile: None,
+                        };
                     }
                     types::SLICE => {
                         slices.push(parse::parse_slice(&mut r)?);
                         ud_target = UdTarget::Slice(slices.len() - 1);
                     }
-                    types::COLOR_PROFILE => color_profile = Some(parse::parse_color_profile(&mut r)?),
+                    types::COLOR_PROFILE => {
+                        color_profile = Some(parse::parse_color_profile(&mut r)?)
+                    }
                     types::EXTERNAL_FILES => external_files = parse::parse_external_files(&mut r)?,
                     types::USER_DATA => {
                         let ud = parse::parse_user_data(&mut r)?;
