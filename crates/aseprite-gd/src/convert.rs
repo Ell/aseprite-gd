@@ -377,3 +377,71 @@ pub fn build_tileset(file: &AseFile) -> Result<Gd<TileSet>, String> {
 
     Ok(tile_set)
 }
+
+/// Builds a StyleBoxTexture from a 9-patch slice (§6.12): the slice rect is
+/// cropped out of the rendered frame, and the center rect becomes the four
+/// texture margins. `slice_name` empty = first slice with a center.
+pub fn build_stylebox(
+    file: &AseFile,
+    slice_name: &str,
+    frame: usize,
+) -> Result<Gd<godot::classes::StyleBoxTexture>, String> {
+    use godot::builtin::Side;
+    use godot::classes::StyleBoxTexture;
+
+    let slice = if slice_name.is_empty() {
+        file.slices
+            .iter()
+            .find(|s| s.keys.first().is_some_and(|k| k.center.is_some()))
+            .ok_or("no 9-patch slice in file")?
+    } else {
+        file.slices
+            .iter()
+            .find(|s| s.name == slice_name)
+            .ok_or_else(|| format!("no slice named {slice_name:?}"))?
+    };
+    let key = slice
+        .key_for(frame as u32)
+        .ok_or("slice has no key at this frame")?;
+    if key.width == 0 || key.height == 0 {
+        return Err("slice is hidden at this frame".to_string());
+    }
+
+    // Crop the slice rect out of the rendered frame, clamped to the canvas.
+    let rendered = render_frame(file, frame).map_err(|e| e.to_string())?;
+    let (cw, ch) = (rendered.width as i64, rendered.height as i64);
+    let x0 = (key.x as i64).clamp(0, cw);
+    let y0 = (key.y as i64).clamp(0, ch);
+    let x1 = (key.x as i64 + key.width as i64).clamp(0, cw);
+    let y1 = (key.y as i64 + key.height as i64).clamp(0, ch);
+    let (w, h) = ((x1 - x0) as usize, (y1 - y0) as usize);
+    if w == 0 || h == 0 {
+        return Err("slice lies outside the canvas".to_string());
+    }
+    let mut pixels = Vec::with_capacity(w * h * 4);
+    for y in y0..y1 {
+        let row = ((y * cw + x0) * 4) as usize;
+        pixels.extend_from_slice(&rendered.pixels[row..row + w * 4]);
+    }
+    let data = PackedByteArray::from(pixels.as_slice());
+    let image = Image::create_from_data(w as i32, h as i32, false, Format::RGBA8, &data)
+        .ok_or("slice Image::create_from_data failed")?;
+    let texture = ImageTexture::create_from_image(&image).ok_or("slice ImageTexture failed")?;
+
+    let mut sb = StyleBoxTexture::new_gd();
+    sb.set_texture(&texture.upcast::<Texture2D>());
+    if let Some((cx, cy, cw_, ch_)) = key.center {
+        // Center rect is relative to the slice bounds (§6.12).
+        sb.set_texture_margin(Side::LEFT, cx as f32);
+        sb.set_texture_margin(Side::TOP, cy as f32);
+        sb.set_texture_margin(
+            Side::RIGHT,
+            (key.width as i64 - cx as i64 - cw_ as i64).max(0) as f32,
+        );
+        sb.set_texture_margin(
+            Side::BOTTOM,
+            (key.height as i64 - cy as i64 - ch_ as i64).max(0) as f32,
+        );
+    }
+    Ok(sb)
+}

@@ -6,6 +6,7 @@
 
 pub mod animation_library;
 pub mod sprite_frames;
+pub mod stylebox;
 pub mod texture;
 pub mod tileset;
 

@@ -56,6 +56,17 @@ func _init():
                 and tset.tile_size == Vector2i(2, 2)
             print("tileset: sources=", src_count, " tiles=", src.get_tiles_count(), " tile_size=", tset.tile_size, " ok=", tset_ok)
 
-    var ok = tex is Texture2D and sf is SpriteFrames and sf.get_animation_names().size() == 3 and doc_ok and atlas_ok and lib_ok and tset_ok
+    # 9-patch slice -> StyleBoxTexture with margins from the center rect.
+    var sb = load("res://sprites/slices.aseprite")
+    var sb_ok = false
+    if sb is StyleBoxTexture:
+        sb_ok = sb.texture != null and sb.texture.get_size() == Vector2(24, 16) \
+            and sb.get_texture_margin(SIDE_LEFT) == 8.0 \
+            and sb.get_texture_margin(SIDE_TOP) == 8.0 \
+            and sb.get_texture_margin(SIDE_RIGHT) == 8.0 \
+            and sb.get_texture_margin(SIDE_BOTTOM) == 4.0
+        print("stylebox: tex=", sb.texture.get_size() if sb.texture else null, " margins=", [sb.get_texture_margin(SIDE_LEFT), sb.get_texture_margin(SIDE_TOP), sb.get_texture_margin(SIDE_RIGHT), sb.get_texture_margin(SIDE_BOTTOM)], " ok=", sb_ok)
+
+    var ok = tex is Texture2D and sf is SpriteFrames and sf.get_animation_names().size() == 3 and doc_ok and atlas_ok and lib_ok and tset_ok and sb_ok
     print("VERIFY: ", "PASS" if ok else "FAIL")
     quit(0 if ok else 1)
