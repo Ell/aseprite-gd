@@ -40,6 +40,7 @@ teammates' machines, and in headless CI.
 - [Post-import hooks](docs/post-import-hooks.md) — reshape imports with your own scripts
 - [Runtime API](docs/runtime-api.md) — `AseDocument`, runtime `load()`, TileSet sync
 - [Troubleshooting](docs/troubleshooting.md)
+- [Publishing](docs/publishing.md) — cutting releases, asset library updates
 
 Working example scenes live in [godot/examples/](godot/examples/).
 

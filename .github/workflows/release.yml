@@ -83,3 +83,73 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" "aseprite-gd-${GITHUB_REF_NAME}.zip" \
             --title "$GITHUB_REF_NAME" --generate-notes
+
+  # The Godot Asset Library installs from a git archive, not release assets,
+  # so a dedicated branch carries the built addon tree (binaries included).
+  assetlib-branch:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: libs
+          merge-multiple: true
+      - name: assemble and push assetlib branch
+        run: |
+          DEST=assetlib-tree/addons/aseprite_gd
+          mkdir -p "$DEST/bin"
+          cp godot/addons/aseprite_gd/plugin.cfg godot/addons/aseprite_gd/plugin.gd "$DEST/"
+          cp libs/* "$DEST/bin/"
+          cp LICENSE README.md "$DEST/"
+          cat > "$DEST/aseprite_gd.gdextension" <<'GDEXT'
+          [configuration]
+          entry_symbol = "gdext_rust_init"
+          compatibility_minimum = 4.2
+
+          [libraries]
+          linux.x86_64 = "res://addons/aseprite_gd/bin/libaseprite_gd.so"
+          windows.x86_64 = "res://addons/aseprite_gd/bin/aseprite_gd.dll"
+          macos = "res://addons/aseprite_gd/bin/libaseprite_gd.dylib"
+          GDEXT
+          sed -i 's/^          //' "$DEST/aseprite_gd.gdextension"
+          cp LICENSE assetlib-tree/LICENSE
+          cp README.md assetlib-tree/README.md
+
+          git config user.name "$(git log -1 --format=%an)"
+          git config user.email "$(git log -1 --format=%ae)"
+          git switch --orphan assetlib
+          find . -maxdepth 1 ! -name . ! -name .git ! -name assetlib-tree -exec rm -rf {} +
+          mv assetlib-tree/* .
+          rmdir assetlib-tree
+          git add -A
+          git commit -m "assetlib: ${GITHUB_REF_NAME}"
+          git push -f origin assetlib
+
+  # Optional: file an update with the Godot Asset Library. Runs only when the
+  # maintainer has configured the secrets (see docs/publishing.md); edits are
+  # human-reviewed on their side before going live.
+  assetlib-update:
+    needs: assetlib-branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      ASSETLIB_USERNAME: ${{ secrets.ASSETLIB_USERNAME }}
+      ASSETLIB_PASSWORD: ${{ secrets.ASSETLIB_PASSWORD }}
+      ASSETLIB_ASSET_ID: ${{ secrets.ASSETLIB_ASSET_ID }}
+    steps:
+      - name: submit asset library edit
+        run: |
+          if [ -z "$ASSETLIB_USERNAME" ] || [ -z "$ASSETLIB_ASSET_ID" ]; then
+            echo "asset library secrets not configured; skipping"
+            exit 0
+          fi
+          API=https://godotengine.org/asset-library/api
+          TOKEN=$(curl -fsS -X POST "$API/login"             --data-urlencode "username=$ASSETLIB_USERNAME"             --data-urlencode "password=$ASSETLIB_PASSWORD" | python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])')
+          COMMIT=$(git ls-remote "https://github.com/${GITHUB_REPOSITORY}.git" refs/heads/assetlib | cut -f1)
+          curl -fsS -X POST "$API/asset/$ASSETLIB_ASSET_ID"             --data-urlencode "token=$TOKEN"             --data-urlencode "version_string=${GITHUB_REF_NAME#v}"             --data-urlencode "download_commit=$COMMIT"             | head -c 400
+          echo
+          echo "edit submitted for review"
