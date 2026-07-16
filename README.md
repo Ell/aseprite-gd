@@ -5,20 +5,30 @@ Native Aseprite importer for Godot 4 — a pure-Rust GDExtension that parses
 no per-machine configuration; imports work identically in the editor, on
 teammates' machines, and in headless CI.
 
-**Status: early development.** Parser core is being built first; see
-[docs/feature-list.md](docs/feature-list.md) for the roadmap.
+**Status: working, pre-release.** See
+[docs/feature-list.md](docs/feature-list.md) for full scope.
 
-## Planned highlights
+## What works today
 
-- Drop a `.aseprite` file in your project → Texture2D, SpriteFrames,
-  AnimationLibrary, or TileSet, pixel-identical to what Aseprite renders
-  (all 19 blend modes, layer/cel opacity, groups, z-index)
-- Real `TileSet` import from Aseprite tilesets, with reimport-safe merging of
-  collision/terrain you author in Godot
-- Slices → AtlasTextures, 9-patch StyleBoxes, pivots, animated hitboxes
-- Layer-convention normal maps → CanvasTexture
-- Cel user data → Call Method tracks / animation markers
-- Runtime loading API for mods and user content
+- Drop a `.aseprite` file in your project and import it as a `Texture2D`,
+  `SpriteFrames`, `AnimationLibrary`, `TileSet`, `StyleBoxTexture`, or
+  `CanvasTexture` — pixel-identical to what Aseprite renders (all 19 blend
+  modes, layer/cel opacity, groups, z-index, tilemaps; verified against
+  Aseprite's own output on every fixture)
+- Tags become animations with exact per-frame durations, loop modes, and
+  ping-pong unrolling; frames share a trimmed, deduped, multi-page atlas
+- Aseprite tilesets import as configured `TileSet` atlas sources; per-tile
+  user data lands in a custom data layer
+- 9-patch slices become `StyleBoxTexture`s; slice rects/pivots/user data are
+  queryable at runtime
+- Layers named `normal`/`specular`/`emission` become `CanvasTexture` maps for
+  lit pixel art
+- Cel user data text becomes AnimationLibrary method tracks (frame-accurate
+  gameplay events)
+- Runtime loading: plain `load()` works on `.aseprite` files in running
+  games, plus an `AseDocument` class for parsing, rendering, and slice/tag
+  queries from GDScript
+- Headless CI imports work with zero external dependencies
 
 ## Repository layout
 
