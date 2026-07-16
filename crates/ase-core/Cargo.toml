@@ -10,3 +10,6 @@ miniz_oxide = "0.8"
 
 [dev-dependencies]
 png = "0.17"
+# Oracle parsers for cross-check tests (tests/oracle.rs) — dev-only, never ship.
+asefile = "0.3"
+aseprite-loader = "0.4"
