@@ -23,6 +23,28 @@ func _init():
             and img != null and img.get_size() == Vector2i(doc.get_size())
         print("ase_document: frames=", doc.get_frame_count(), " tags=", doc.get_tag_names(), " ok=", doc_ok)
 
-    var ok = tex is Texture2D and sf is SpriteFrames and sf.get_animation_names().size() == 3 and doc_ok
+    # SpriteFrames frames come from a shared packed atlas; margins restore
+    # canvas size after trimming.
+    var f0 = sf.get_frame_texture("forward", 0)
+    var atlas_ok = f0 is AtlasTexture and f0.get_size() == Vector2(doc.get_size())
+    print("atlas: ", f0, " size=", f0.get_size() if f0 != null else "N/A", " ok=", atlas_ok)
+
+    # AnimationLibrary with texture value track + method track from cel user data.
+    var lib = load("res://sprites/user_data.aseprite")
+    var lib_ok = false
+    if lib is AnimationLibrary:
+        var names = lib.get_animation_list()
+        var a = lib.get_animation(names[0])
+        var has_tex_track = false
+        var method_key = ""
+        for ti in a.get_track_count():
+            if a.track_get_type(ti) == Animation.TYPE_VALUE and String(a.track_get_path(ti)).ends_with(":texture"):
+                has_tex_track = a.track_get_key_count(ti) > 0
+            if a.track_get_type(ti) == Animation.TYPE_METHOD and a.track_get_key_count(ti) > 0:
+                method_key = a.method_track_get_name(ti, 0)
+        lib_ok = names.size() == 3 and has_tex_track and method_key == "test_user_data_cel"
+        print("animlib: anims=", names, " tex_track=", has_tex_track, " method=", method_key, " ok=", lib_ok)
+
+    var ok = tex is Texture2D and sf is SpriteFrames and sf.get_animation_names().size() == 3 and doc_ok and atlas_ok and lib_ok
     print("VERIFY: ", "PASS" if ok else "FAIL")
     quit(0 if ok else 1)

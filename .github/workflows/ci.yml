@@ -92,10 +92,15 @@ jobs:
       - name: headless import
         shell: bash
         run: |
+          # Cold first scan with a GDExtension can segfault Godot 4.7 at the
+          # editor-layout stage AFTER imports complete (engine bug; warm runs
+          # are clean). Tolerate the cold run's exit code; the warm run and
+          # the resource verification below are the real gates.
+          godot --headless --path godot --import 2>&1 | tee import-cold.log || true
           godot --headless --path godot --import 2>&1 | tee import.log
           # a missing/broken extension library does NOT make --import exit
           # nonzero — catch it explicitly
-          if grep -qE "Can't open dynamic library|GDExtension dynamic library not found" import.log; then
+          if grep -qE "Can't open dynamic library|GDExtension dynamic library not found" import-cold.log import.log; then
             echo "::error::GDExtension failed to load during import" >&2
             exit 1
           fi

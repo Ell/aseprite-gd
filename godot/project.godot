@@ -9,6 +9,10 @@ config_version=5
 config/name="aseprite-gd demo"
 config/features=PackedStringArray("4.2")
 
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/aseprite_gd/plugin.cfg")
+
 [rendering]
 
 textures/canvas_textures/default_texture_filter=0

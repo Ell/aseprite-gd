@@ -4,9 +4,9 @@
 
 use godot::prelude::*;
 
+pub mod atlas;
 pub mod convert;
 pub mod import;
-pub mod plugin;
 pub mod runtime;
 
 struct AsepriteGdExtension;
