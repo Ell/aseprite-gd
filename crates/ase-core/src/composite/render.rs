@@ -9,8 +9,9 @@
 use std::borrow::Cow;
 use std::fmt;
 
-use crate::composite::blend::{blend, mul_un8, Rgba};
+use crate::composite::blend::{Rgba, blend, mul_un8};
 use crate::file::AseFile;
+use crate::limits::{MAX_CANVAS_DIM, MAX_IMAGE_BYTES};
 use crate::model::{
     BlendMode, Cel, CelContent, CelImage, CelTilemap, ColorDepth, LayerType, Palette,
 };
@@ -18,10 +19,18 @@ use crate::model::{
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RenderError {
     BadFrame(usize),
-    BrokenLink { frame: usize, layer: usize },
-    MissingTileset { layer: usize },
+    BrokenLink {
+        frame: usize,
+        layer: usize,
+    },
+    MissingTileset {
+        layer: usize,
+    },
     /// Construct not composited yet (currently: external tilesets).
     Unsupported(&'static str),
+    /// A safety limit from [`crate::limits`] was exceeded while compositing
+    /// (e.g. a materialized tilemap larger than any legitimate sprite).
+    LimitExceeded(&'static str),
 }
 
 impl fmt::Display for RenderError {
@@ -29,12 +38,18 @@ impl fmt::Display for RenderError {
         match self {
             RenderError::BadFrame(i) => write!(f, "frame {i} out of range"),
             RenderError::BrokenLink { frame, layer } => {
-                write!(f, "linked cel resolution failed (frame {frame}, layer {layer})")
+                write!(
+                    f,
+                    "linked cel resolution failed (frame {frame}, layer {layer})"
+                )
             }
             RenderError::MissingTileset { layer } => {
                 write!(f, "tilemap layer {layer} references a missing tileset")
             }
             RenderError::Unsupported(what) => write!(f, "unsupported for rendering: {what}"),
+            RenderError::LimitExceeded(what) => {
+                write!(f, "safety limit exceeded while rendering: {what}")
+            }
         }
     }
 }
@@ -69,7 +84,11 @@ fn pixel_to_rgba(
             // Out-of-range indices are transparent; on a background layer
             // every index paints opaque (§7).
             palette.entries.get(idx as usize).map(|&[r, g, b, a]| {
-                if on_background { [r, g, b, 255] } else { [r, g, b, a] }
+                if on_background {
+                    [r, g, b, 255]
+                } else {
+                    [r, g, b, a]
+                }
             })
         }
     }
@@ -90,11 +109,24 @@ fn materialize_tilemap(
         .iter()
         .find(|t| t.id == tileset_index)
         .ok_or(RenderError::MissingTileset { layer: layer_index })?;
-    let strip = ts.pixels.as_ref().ok_or(RenderError::Unsupported("external tileset"))?;
+    let strip = ts
+        .pixels
+        .as_ref()
+        .ok_or(RenderError::Unsupported("external tileset"))?;
 
     let bpp = file.header.color_depth.bytes_per_pixel();
     let (tw, th) = (ts.tile_width as usize, ts.tile_height as usize);
     let (w, h) = (tm.width as usize * tw, tm.height as usize * th);
+    // All four factors are file-derived u16s: the materialized buffer can
+    // reach petabytes (and `w as u16` below would truncate) without a cap.
+    if w > MAX_CANVAS_DIM as usize || h > MAX_CANVAS_DIM as usize {
+        return Err(RenderError::LimitExceeded(
+            "materialized tilemap dimensions",
+        ));
+    }
+    if w * h * bpp > MAX_IMAGE_BYTES {
+        return Err(RenderError::LimitExceeded("materialized tilemap size"));
+    }
 
     // Empty cells stay transparent: alpha 0 for RGBA/grayscale (zeroed), the
     // transparent index for indexed sprites.
@@ -135,7 +167,11 @@ fn materialize_tilemap(
         }
     }
 
-    Ok(CelImage { width: w as u16, height: h as u16, pixels: out })
+    Ok(CelImage {
+        width: w as u16,
+        height: h as u16,
+        pixels: out,
+    })
 }
 
 /// Resolves a cel to drawable pixels: follows linked cels to their content
@@ -156,10 +192,13 @@ fn resolve_pixels<'a>(
                 return materialize_tilemap(file, cel.layer_index, tm).map(|i| Some(Cow::Owned(i)));
             }
             CelContent::Linked(target) => {
-                let frame = file.frames.get(*target as usize).ok_or(RenderError::BrokenLink {
-                    frame: frame_index,
-                    layer: cel.layer_index,
-                })?;
+                let frame = file
+                    .frames
+                    .get(*target as usize)
+                    .ok_or(RenderError::BrokenLink {
+                        frame: frame_index,
+                        layer: cel.layer_index,
+                    })?;
                 match frame.cels.iter().find(|c| c.layer_index == cel.layer_index) {
                     Some(c) => content = &c.content,
                     None => return Ok(None),
@@ -167,7 +206,10 @@ fn resolve_pixels<'a>(
             }
         }
     }
-    Err(RenderError::BrokenLink { frame: frame_index, layer: cel.layer_index })
+    Err(RenderError::BrokenLink {
+        frame: frame_index,
+        layer: cel.layer_index,
+    })
 }
 
 /// Composites one cel onto `buf` (canvas-sized RGBA).
@@ -190,7 +232,10 @@ fn draw_cel(
     let (mode, opacity) = if background {
         (BlendMode::Normal, 255)
     } else {
-        (layer.blend_mode, mul_un8(layer.opacity as i32, cel.opacity as i32))
+        (
+            layer.blend_mode,
+            mul_un8(layer.opacity as i32, cel.opacity as i32),
+        )
     };
 
     let bpp = file.header.color_depth.bytes_per_pixel();
@@ -274,14 +319,21 @@ fn render_children(
 
 /// Flattens one frame to canvas-sized RGBA (§8).
 pub fn render_frame(file: &AseFile, frame_index: usize) -> Result<RgbaImage, RenderError> {
-    let frame = file.frames.get(frame_index).ok_or(RenderError::BadFrame(frame_index))?;
+    let frame = file
+        .frames
+        .get(frame_index)
+        .ok_or(RenderError::BadFrame(frame_index))?;
     let palette = file.palette_for(frame_index);
     let (w, h) = (file.header.width as usize, file.header.height as usize);
     let mut buf = vec![0u8; w * h * 4];
 
     if file.header.group_blend_valid() {
         render_children(file, frame_index, palette, None, &mut buf, w, h)?;
-        return Ok(RgbaImage { width: w as u32, height: h as u32, pixels: buf });
+        return Ok(RgbaImage {
+            width: w as u32,
+            height: h as u32,
+            pixels: buf,
+        });
     }
 
     // Pass-through groups: flat draw order over all cels — layer index +
@@ -302,7 +354,11 @@ pub fn render_frame(file: &AseFile, frame_index: usize) -> Result<RgbaImage, Ren
         draw_cel(file, frame_index, palette, cel, &mut buf, w, h)?;
     }
 
-    Ok(RgbaImage { width: w as u32, height: h as u32, pixels: buf })
+    Ok(RgbaImage {
+        width: w as u32,
+        height: h as u32,
+        pixels: buf,
+    })
 }
 
 #[cfg(test)]
@@ -360,7 +416,10 @@ mod tests {
                 layer(LayerType::Group, None, BlendMode::Normal),
                 layer(LayerType::Image, Some(1), BlendMode::Addition),
             ],
-            frames: vec![Frame { duration_ms: 100, cels: vec![cel(0), cel(2)] }],
+            frames: vec![Frame {
+                duration_ms: 100,
+                cels: vec![cel(0), cel(2)],
+            }],
             tags: vec![],
             tilesets: vec![],
             slices: vec![],
@@ -403,5 +462,50 @@ mod tests {
         file.layers[1].flags = 0; // group invisible
         let out = render_frame(&file, 0).unwrap();
         assert_eq!(&out.pixels, &[100, 100, 100, 255], "only the base layer");
+    }
+
+    /// `tilemap cells x tile size` are all file-derived u16s; unchecked, the
+    /// materialized buffer for a hostile file reaches petabytes.
+    #[test]
+    fn oversized_tilemap_materialization_is_rejected() {
+        use crate::model::{CelTilemap, Tileset};
+
+        let mut file = group_file(1);
+        file.layers[0].layer_type = LayerType::Tilemap { tileset_index: 0 };
+        file.layers.truncate(1);
+        file.tilesets = vec![Tileset {
+            id: 0,
+            flags: 0,
+            num_tiles: 1,
+            tile_width: u16::MAX,
+            tile_height: u16::MAX,
+            base_index: 1,
+            name: String::new(),
+            pixels: Some(Vec::new()),
+            external: None,
+            user_data: Default::default(),
+            tile_user_data: Vec::new(),
+        }];
+        file.frames[0].cels = vec![crate::model::Cel {
+            layer_index: 0,
+            x: 0,
+            y: 0,
+            opacity: 255,
+            z_index: 0,
+            content: CelContent::Tilemap(CelTilemap {
+                width: u16::MAX,
+                height: u16::MAX,
+                tiles: Vec::new(),
+            }),
+            extra: None,
+            user_data: Default::default(),
+        }];
+
+        assert!(matches!(
+            render_frame(&file, 0),
+            Err(RenderError::LimitExceeded(
+                "materialized tilemap dimensions"
+            ))
+        ));
     }
 }
