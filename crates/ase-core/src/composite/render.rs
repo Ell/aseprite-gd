@@ -11,6 +11,7 @@ use std::fmt;
 
 use crate::composite::blend::{Rgba, blend, mul_un8};
 use crate::file::AseFile;
+use crate::limits::{MAX_CANVAS_DIM, MAX_IMAGE_BYTES};
 use crate::model::{
     BlendMode, Cel, CelContent, CelImage, CelTilemap, ColorDepth, LayerType, Palette,
 };
@@ -27,6 +28,9 @@ pub enum RenderError {
     },
     /// Construct not composited yet (currently: external tilesets).
     Unsupported(&'static str),
+    /// A safety limit from [`crate::limits`] was exceeded while compositing
+    /// (e.g. a materialized tilemap larger than any legitimate sprite).
+    LimitExceeded(&'static str),
 }
 
 impl fmt::Display for RenderError {
@@ -43,6 +47,9 @@ impl fmt::Display for RenderError {
                 write!(f, "tilemap layer {layer} references a missing tileset")
             }
             RenderError::Unsupported(what) => write!(f, "unsupported for rendering: {what}"),
+            RenderError::LimitExceeded(what) => {
+                write!(f, "safety limit exceeded while rendering: {what}")
+            }
         }
     }
 }
@@ -110,6 +117,16 @@ fn materialize_tilemap(
     let bpp = file.header.color_depth.bytes_per_pixel();
     let (tw, th) = (ts.tile_width as usize, ts.tile_height as usize);
     let (w, h) = (tm.width as usize * tw, tm.height as usize * th);
+    // All four factors are file-derived u16s: the materialized buffer can
+    // reach petabytes (and `w as u16` below would truncate) without a cap.
+    if w > MAX_CANVAS_DIM as usize || h > MAX_CANVAS_DIM as usize {
+        return Err(RenderError::LimitExceeded(
+            "materialized tilemap dimensions",
+        ));
+    }
+    if w * h * bpp > MAX_IMAGE_BYTES {
+        return Err(RenderError::LimitExceeded("materialized tilemap size"));
+    }
 
     // Empty cells stay transparent: alpha 0 for RGBA/grayscale (zeroed), the
     // transparent index for indexed sprites.
@@ -445,5 +462,50 @@ mod tests {
         file.layers[1].flags = 0; // group invisible
         let out = render_frame(&file, 0).unwrap();
         assert_eq!(&out.pixels, &[100, 100, 100, 255], "only the base layer");
+    }
+
+    /// `tilemap cells x tile size` are all file-derived u16s; unchecked, the
+    /// materialized buffer for a hostile file reaches petabytes.
+    #[test]
+    fn oversized_tilemap_materialization_is_rejected() {
+        use crate::model::{CelTilemap, Tileset};
+
+        let mut file = group_file(1);
+        file.layers[0].layer_type = LayerType::Tilemap { tileset_index: 0 };
+        file.layers.truncate(1);
+        file.tilesets = vec![Tileset {
+            id: 0,
+            flags: 0,
+            num_tiles: 1,
+            tile_width: u16::MAX,
+            tile_height: u16::MAX,
+            base_index: 1,
+            name: String::new(),
+            pixels: Some(Vec::new()),
+            external: None,
+            user_data: Default::default(),
+            tile_user_data: Vec::new(),
+        }];
+        file.frames[0].cels = vec![crate::model::Cel {
+            layer_index: 0,
+            x: 0,
+            y: 0,
+            opacity: 255,
+            z_index: 0,
+            content: CelContent::Tilemap(CelTilemap {
+                width: u16::MAX,
+                height: u16::MAX,
+                tiles: Vec::new(),
+            }),
+            extra: None,
+            user_data: Default::default(),
+        }];
+
+        assert!(matches!(
+            render_frame(&file, 0),
+            Err(RenderError::LimitExceeded(
+                "materialized tilemap dimensions"
+            ))
+        ));
     }
 }

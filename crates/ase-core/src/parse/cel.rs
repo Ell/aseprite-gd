@@ -42,7 +42,13 @@ pub fn inflate_exact(
 ) -> Result<Vec<u8>> {
     let offset = r.pos();
     budget.charge(offset, expected)?;
-    let compressed = r.bytes(chunk_end - offset)?;
+    // The fixed cel fields are bounds-checked against the file, not the chunk,
+    // so a lying chunk size can leave the reader past `chunk_end` (gotcha #1).
+    let compressed_len = chunk_end.checked_sub(offset).ok_or(ParseError::Invalid {
+        offset,
+        what: "cel chunk size (fields overrun chunk)",
+    })?;
+    let compressed = r.bytes(compressed_len)?;
     let out = decompress_to_vec_zlib_with_limit(compressed, expected).map_err(|_| {
         ParseError::Invalid {
             offset,

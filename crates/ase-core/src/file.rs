@@ -81,6 +81,13 @@ impl AseFile {
             let frame_end = frame_start + fh.frame_bytes as usize;
             let mut cels = Vec::new();
             let mut last_cel: Option<usize> = None;
+            // `cels` is frame-local but `ud_target` persists across frames: a
+            // cel target left over from the previous frame would index into
+            // the new (empty) vec. Cel user data only ever follows its cel
+            // within the same frame (§6.11), so drop the stale target.
+            if matches!(ud_target, UdTarget::Cel(_)) {
+                ud_target = UdTarget::None;
+            }
 
             for _ in 0..fh.num_chunks {
                 let ch = parse_chunk_header(&mut r, frame_end)?;
@@ -124,10 +131,16 @@ impl AseFile {
                         let start = tags.len();
                         tags.extend(parse::parse_tags(&mut r)?);
                         // The next N user data chunks belong to these tags in
-                        // order (§6.11).
-                        ud_target = UdTarget::Tags {
-                            next: start,
-                            end: tags.len(),
+                        // order (§6.11). An empty tag run must not create a
+                        // target, or the first user data chunk would index
+                        // `tags[start]` out of bounds.
+                        ud_target = if start < tags.len() {
+                            UdTarget::Tags {
+                                next: start,
+                                end: tags.len(),
+                            }
+                        } else {
+                            UdTarget::None
                         };
                     }
                     types::PALETTE => {

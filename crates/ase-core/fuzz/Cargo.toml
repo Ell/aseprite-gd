@@ -1,0 +1,30 @@
+[package]
+name = "ase-core-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+ase-core = { path = ".." }
+
+[[bin]]
+name = "parse"
+path = "fuzz_targets/parse.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "render"
+path = "fuzz_targets/render.rs"
+test = false
+doc = false
+bench = false
+
+# Standalone: keeps the fuzz crate out of the root workspace so `cargo build`
+# / `cargo test` at the repo root are unaffected.
+[workspace]
