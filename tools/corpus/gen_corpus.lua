@@ -221,4 +221,66 @@ do
   spr:close()
 end
 
+-- Demo character: everything the AnimationPlayer import consumes in one
+-- file — three tags (loop, ping-pong, play-once), two layers for split
+-- mode, cel user data for method tracks, a slice for hitbox tracks, and
+-- motion that is obvious in playback.
+do
+  local spr = Sprite(32, 32, ColorMode.RGB)
+  spr.layers[1].name = "body"
+  local fx = spr:newLayer()
+  fx.name = "fx"
+  fx.blendMode = BlendMode.ADDITION
+
+  local function block(color, x, y, size)
+    local img = Image(size, size, ColorMode.RGB)
+    for py = 0, size - 1 do
+      for px = 0, size - 1 do
+        img:putPixel(px, py, color)
+      end
+    end
+    return img, Point(x, y)
+  end
+
+  -- 8 frames: idle bobs, walk slides, blink flashes.
+  local specs = {
+    { color = app.pixelColor.rgba(80, 200, 120, 255), x = 12, y = 14 }, -- idle
+    { color = app.pixelColor.rgba(80, 200, 120, 255), x = 12, y = 16 },
+    { color = app.pixelColor.rgba(90, 140, 255, 255), x = 2, y = 15 }, -- walk
+    { color = app.pixelColor.rgba(90, 140, 255, 255), x = 9, y = 13 },
+    { color = app.pixelColor.rgba(90, 140, 255, 255), x = 16, y = 15 },
+    { color = app.pixelColor.rgba(90, 140, 255, 255), x = 23, y = 13 },
+    { color = app.pixelColor.rgba(255, 220, 80, 255), x = 12, y = 15 }, -- blink
+    { color = app.pixelColor.rgba(255, 255, 255, 255), x = 12, y = 15 },
+  }
+  for i, sp in ipairs(specs) do
+    if i > 1 then spr:newFrame() end
+    spr.frames[i].duration = (i <= 2) and 0.2 or ((i <= 6) and 0.1 or 0.08)
+    local img, at = block(sp.color, sp.x, sp.y, 8)
+    spr:newCel(spr.layers[1], i, img, at)
+    local glow, gat = block(app.pixelColor.rgba(60, 60, 60, 255), sp.x - 1, sp.y - 1, 10)
+    spr:newCel(fx, i, glow, gat)
+  end
+
+  local idle = spr:newTag(1, 2)
+  idle.name = "idle"
+  local walk = spr:newTag(3, 6)
+  walk.name = "walk"
+  walk.aniDir = AniDir.PING_PONG
+  local blink = spr:newTag(7, 8)
+  blink.name = "blink"
+  blink.repeats = 1
+
+  -- Footstep events on the walk contact frames.
+  spr.layers[1]:cel(4).data = "footstep"
+  spr.layers[1]:cel(6).data = "footstep"
+
+  local hurt = spr:newSlice(Rectangle(10, 12, 12, 12))
+  hurt.name = "hurtbox"
+
+  spr:saveAs(out .. "/demo_character.aseprite")
+  spr:saveCopyAs(out .. "/demo_character.png")
+  spr:close()
+end
+
 print("corpus written to " .. out)

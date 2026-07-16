@@ -104,12 +104,30 @@ fn generated_fixtures_render_pixel_identical_to_aseprite() {
         if path.extension().and_then(|e| e.to_str()) != Some("aseprite") {
             continue;
         }
-        if let Err(e) = check(&path, 0, &path.with_extension("png")) {
-            panic!("{}: {e}", path.display());
+        let single = path.with_extension("png");
+        if single.exists() {
+            if let Err(e) = check(&path, 0, &single) {
+                panic!("{}: {e}", path.display());
+            }
+        } else {
+            // Multi-frame fixtures export a 1-based sequence: <stem>N.png.
+            let stem = path.file_stem().unwrap().to_str().unwrap();
+            let mut frame = 0;
+            loop {
+                let golden = path.with_file_name(format!("{stem}{}.png", frame + 1));
+                if !golden.exists() {
+                    assert!(frame > 0, "{}: no goldens found", path.display());
+                    break;
+                }
+                if let Err(e) = check(&path, frame, &golden) {
+                    panic!("{} frame {frame}: {e}", path.display());
+                }
+                frame += 1;
+            }
         }
         checked += 1;
     }
-    assert_eq!(checked, 25, "expected 19 blend-mode + 6 feature goldens");
+    assert_eq!(checked, 26, "expected 19 blend-mode + 7 feature goldens");
 }
 
 #[test]

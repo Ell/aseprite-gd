@@ -208,6 +208,28 @@ func _init():
     print("anim_merge: n1=", n1, " n2=", n2, " custom_kept=", has_custom, " tracks=", tag0b.get_track_count(), "/", tracks_before, " ok=", merge_ok)
     player.free()
 
+    # Demo character: the AnimationPlayer showcase file must carry all the
+    # merge inputs (tags, footstep user data, slice, two layers).
+    var demo := AnimationPlayer.new()
+    var dn = AseAnimationImport.merge_into_player(demo, "res://sprites/demo_character.aseprite", {"sprite_path": "Sprite2D", "slice_tracks": true, "create_reset_animation": true})
+    var dlib = demo.get_animation_library("")
+    var walk: Animation = dlib.get_animation("walk")
+    var footsteps = 0
+    var hitbox_track = false
+    for ti in walk.get_track_count():
+        if walk.track_get_type(ti) == Animation.TYPE_METHOD:
+            footsteps = walk.track_get_key_count(ti)
+        if String(walk.track_get_path(ti)) == "hurtbox:position":
+            hitbox_track = true
+    var demo_ok = dn == 4 and dlib.has_animation("idle") and dlib.has_animation("blink") \
+        and dlib.has_animation("RESET") \
+        and walk.loop_mode == Animation.LOOP_LINEAR \
+        and dlib.get_animation("blink").loop_mode == Animation.LOOP_NONE \
+        and footsteps == 3 and hitbox_track # ping-pong revisits the frame-3 footstep
+    print("demo_character: anims=", dn, " footsteps=", footsteps, " hitbox=", hitbox_track, " ok=", demo_ok)
+    demo.free()
+    ok = ok and demo_ok
+
     # SpriteFrames assignment helper.
     var asprite := AnimatedSprite2D.new()
     var assign_ok = AseAnimationImport.assign_sprite_frames(asprite, "res://sprites/tags3.aseprite", {}) \
