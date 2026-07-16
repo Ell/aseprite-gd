@@ -16,19 +16,28 @@ That branch exists because the Godot Asset Library installs from a git
 archive of the repository, not from release assets — pointing an asset entry
 at `main` would give users source code with no libraries.
 
-## Godot Asset Library
+## Godot Asset Store (store.godotengine.org)
 
-One-time setup (requires a public repository):
+The official store accepts direct file uploads — the release zip is the
+exact artifact it wants. Per release:
 
-1. Register an account at godotengine.org/asset-library.
-2. Submit the asset once by hand: category "Tools", license MIT,
-   repository URL, the `assetlib` branch's latest commit as the download
-   commit, an icon URL, and the description. First submissions are reviewed
-   by the library moderators.
-3. After approval, note the asset id from its URL and add three repository
-   secrets: `ASSETLIB_USERNAME`, `ASSETLIB_PASSWORD`, `ASSETLIB_ASSET_ID`.
+1. Sign in and add a new version to the asset (or create the asset once at
+   `/asset/new/`: category, MIT license, description, icon, screenshots).
+2. Upload `aseprite-gd-<tag>.zip` from the GitHub release.
 
-From then on, every tagged release submits a version edit automatically
-(the `assetlib-update` job); edits wait in the library's review queue before
-going live. Without the secrets the job skips itself, so releases work fine
-before the asset library is set up.
+There is no published automation API yet; uploads are manual. The store is
+integrated into the editor from Godot 4.7.
+
+## Legacy Asset Library (optional)
+
+The pre-4.7 editor AssetLib tab uses the older godotengine.org/asset-library,
+which is deprecated (soon read-only) and installs from git archives rather
+than uploads. If listing there anyway:
+
+1. Register an account and submit once by hand, pointing the download at the
+   `assetlib` branch's latest commit (that orphan branch carries the built
+   addon tree exactly for this purpose; the release workflow refreshes it).
+2. After approval, add repository secrets `ASSETLIB_USERNAME`,
+   `ASSETLIB_PASSWORD`, and `ASSETLIB_ASSET_ID`; each tagged release then
+   files a version edit automatically. Without the secrets that job skips
+   itself.
