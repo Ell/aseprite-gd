@@ -2,8 +2,8 @@
 //! indexes the input buffer directly. `unsafe` is forbidden in this crate's
 //! parse paths (see AGENTS.md).
 
-use crate::error::ParseError;
 use crate::Result;
+use crate::error::ParseError;
 
 /// A cursor over the raw file bytes. Cheap to clone; offsets are absolute so
 /// errors and chunk seeks always refer to real file positions.
@@ -32,7 +32,10 @@ impl<'a> Reader<'a> {
     /// rather than assuming fields were fully consumed (§2, gotcha #1).
     pub fn seek(&mut self, offset: usize) -> Result<()> {
         if offset > self.data.len() {
-            return Err(ParseError::UnexpectedEof { offset: self.data.len(), needed: offset - self.data.len() });
+            return Err(ParseError::UnexpectedEof {
+                offset: self.data.len(),
+                needed: offset - self.data.len(),
+            });
         }
         self.pos = offset;
         Ok(())
@@ -48,7 +51,10 @@ impl<'a> Reader<'a> {
 
     pub fn bytes(&mut self, n: usize) -> Result<&'a [u8]> {
         if self.remaining() < n {
-            return Err(ParseError::UnexpectedEof { offset: self.pos, needed: n - self.remaining() });
+            return Err(ParseError::UnexpectedEof {
+                offset: self.pos,
+                needed: n - self.remaining(),
+            });
         }
         let out = &self.data[self.pos..self.pos + n];
         self.pos += n;
@@ -115,7 +121,13 @@ mod tests {
         assert_eq!(r.u16().unwrap(), 0x0403);
         assert_eq!(r.pos(), 4);
         assert_eq!(r.u8().unwrap(), 0x05);
-        assert!(matches!(r.u8(), Err(ParseError::UnexpectedEof { offset: 5, needed: 1 })));
+        assert!(matches!(
+            r.u8(),
+            Err(ParseError::UnexpectedEof {
+                offset: 5,
+                needed: 1
+            })
+        ));
     }
 
     #[test]

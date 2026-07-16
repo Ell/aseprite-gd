@@ -7,8 +7,8 @@
 
 use std::path::{Path, PathBuf};
 
-use ase_core::composite::render_frame;
 use ase_core::AseFile;
+use ase_core::composite::render_frame;
 
 fn fixtures_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures")
@@ -23,10 +23,14 @@ fn load_png_rgba(path: &Path) -> (u32, u32, Vec<u8>) {
     buf.truncate(info.buffer_size());
     let rgba = match info.color_type {
         png::ColorType::Rgba => buf,
-        png::ColorType::Rgb => buf.chunks_exact(3).flat_map(|c| [c[0], c[1], c[2], 255]).collect(),
-        png::ColorType::GrayscaleAlpha => {
-            buf.chunks_exact(2).flat_map(|c| [c[0], c[0], c[0], c[1]]).collect()
-        }
+        png::ColorType::Rgb => buf
+            .chunks_exact(3)
+            .flat_map(|c| [c[0], c[1], c[2], 255])
+            .collect(),
+        png::ColorType::GrayscaleAlpha => buf
+            .chunks_exact(2)
+            .flat_map(|c| [c[0], c[0], c[0], c[1]])
+            .collect(),
         png::ColorType::Grayscale => buf.iter().flat_map(|&v| [v, v, v, 255]).collect(),
         other => panic!("{}: unexpected png color type {other:?}", path.display()),
     };
@@ -42,7 +46,10 @@ fn check(ase_path: &Path, frame: usize, golden_path: &Path) -> Result<(), String
     let (gw, gh, golden) = load_png_rgba(golden_path);
 
     if (ours.width, ours.height) != (gw, gh) {
-        return Err(format!("size {}x{} vs golden {gw}x{gh}", ours.width, ours.height));
+        return Err(format!(
+            "size {}x{} vs golden {gw}x{gh}",
+            ours.width, ours.height
+        ));
     }
     // Pixels transparent on both sides count as equal regardless of RGB:
     // straight alpha means Aseprite's exports carry meaningless source RGB
@@ -50,7 +57,12 @@ fn check(ase_path: &Path, frame: usize, golden_path: &Path) -> Result<(), String
     // our canvas starts zeroed.
     let (mut worst, mut worst_i) = (0i32, 0usize);
     let mut diffs = 0usize;
-    for (px, (a, b)) in ours.pixels.chunks_exact(4).zip(golden.chunks_exact(4)).enumerate() {
+    for (px, (a, b)) in ours
+        .pixels
+        .chunks_exact(4)
+        .zip(golden.chunks_exact(4))
+        .enumerate()
+    {
         if a[3] == 0 && b[3] == 0 {
             continue;
         }
@@ -81,7 +93,10 @@ fn check(ase_path: &Path, frame: usize, golden_path: &Path) -> Result<(), String
 #[test]
 fn generated_fixtures_render_pixel_identical_to_aseprite() {
     let dir = fixtures_root().join("generated");
-    let mut entries: Vec<_> = std::fs::read_dir(&dir).unwrap().map(|e| e.unwrap().path()).collect();
+    let mut entries: Vec<_> = std::fs::read_dir(&dir)
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .collect();
     entries.sort();
 
     let mut checked = 0;
@@ -101,23 +116,32 @@ fn generated_fixtures_render_pixel_identical_to_aseprite() {
 fn vendored_fixtures_render_pixel_identical_to_aseprite() {
     let root = fixtures_root();
     let goldens = root.join("goldens");
-    let mut entries: Vec<_> =
-        std::fs::read_dir(&goldens).unwrap().map(|e| e.unwrap().path()).collect();
+    let mut entries: Vec<_> = std::fs::read_dir(&goldens)
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .collect();
     entries.sort();
-    assert!(entries.len() >= 100, "goldens missing — run tools/corpus/generate.sh");
+    assert!(
+        entries.len() >= 100,
+        "goldens missing — run tools/corpus/generate.sh"
+    );
 
     let mut failures = Vec::new();
     let mut checked = 0;
     for golden_path in entries {
         let stem = golden_path.file_stem().unwrap().to_str().unwrap();
-        let (name, frame) = stem.rsplit_once('@').expect("golden name shape <fixture>@<frame>");
+        let (name, frame) = stem
+            .rsplit_once('@')
+            .expect("golden name shape <fixture>@<frame>");
         let frame: usize = frame.parse().unwrap();
 
         let root = &root;
         let ase_path = ["aseprite-tests", "asefile"]
             .iter()
             .flat_map(|d| {
-                ["aseprite", "ase"].iter().map(move |e| root.join(d).join(format!("{name}.{e}")))
+                ["aseprite", "ase"]
+                    .iter()
+                    .map(move |e| root.join(d).join(format!("{name}.{e}")))
             })
             .find(|p| p.exists())
             .unwrap_or_else(|| panic!("no fixture for golden {stem}"));

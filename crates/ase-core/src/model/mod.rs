@@ -154,7 +154,9 @@ pub enum LayerType {
     Image,
     Group,
     /// Carries the index into [`AseFile::tilesets`].
-    Tilemap { tileset_index: u32 },
+    Tilemap {
+        tileset_index: u32,
+    },
 }
 
 /// One layer (§6.2). Layers are stored flat in file order — the index in
@@ -358,9 +360,16 @@ pub struct CelExtra {
 #[derive(Debug, Clone, PartialEq)]
 pub enum ColorProfile {
     /// Old files: no profile recorded.
-    None { fixed_gamma: Option<f64> },
-    Srgb { fixed_gamma: Option<f64> },
-    Icc { fixed_gamma: Option<f64>, data: Vec<u8> },
+    None {
+        fixed_gamma: Option<f64>,
+    },
+    Srgb {
+        fixed_gamma: Option<f64>,
+    },
+    Icc {
+        fixed_gamma: Option<f64>,
+        data: Vec<u8>,
+    },
 }
 
 /// External files chunk entry (§6.6).

@@ -1,11 +1,11 @@
 //! File header (§3 of docs/ase-format-reference.md).
 
+use crate::Result;
 use crate::error::ParseError;
 use crate::limits::MAX_CANVAS_DIM;
 use crate::model::{ColorDepth, Header};
 use crate::parse::{FILE_MAGIC, HEADER_SIZE};
 use crate::read::Reader;
-use crate::Result;
 
 /// Parses the 128-byte header and leaves the reader positioned at offset 128
 /// (start of the first frame), regardless of reserved trailing bytes.
@@ -15,26 +15,41 @@ pub fn parse_header(r: &mut Reader) -> Result<Header> {
     let magic_offset = r.pos();
     let magic = r.u16()?;
     if magic != FILE_MAGIC {
-        return Err(ParseError::BadMagic { offset: magic_offset, expected: FILE_MAGIC, found: magic });
+        return Err(ParseError::BadMagic {
+            offset: magic_offset,
+            expected: FILE_MAGIC,
+            found: magic,
+        });
     }
 
     let frames = r.u16()?;
     if frames == 0 {
-        return Err(ParseError::Invalid { offset: 6, what: "frame count (zero)" });
+        return Err(ParseError::Invalid {
+            offset: 6,
+            what: "frame count (zero)",
+        });
     }
     let width = r.u16()?;
     let height = r.u16()?;
     if width == 0 || height == 0 {
-        return Err(ParseError::Invalid { offset: 8, what: "canvas size (zero dimension)" });
+        return Err(ParseError::Invalid {
+            offset: 8,
+            what: "canvas size (zero dimension)",
+        });
     }
     if u32::from(width) > MAX_CANVAS_DIM || u32::from(height) > MAX_CANVAS_DIM {
-        return Err(ParseError::LimitExceeded { offset: 8, what: "canvas size" });
+        return Err(ParseError::LimitExceeded {
+            offset: 8,
+            what: "canvas size",
+        });
     }
 
     let depth_offset = r.pos();
     let bpp = r.u16()?;
-    let color_depth = ColorDepth::from_bpp(bpp)
-        .ok_or(ParseError::Invalid { offset: depth_offset, what: "color depth (expected 8/16/32 bpp)" })?;
+    let color_depth = ColorDepth::from_bpp(bpp).ok_or(ParseError::Invalid {
+        offset: depth_offset,
+        what: "color depth (expected 8/16/32 bpp)",
+    })?;
 
     let flags = r.u32()?;
     let default_frame_duration_ms = r.u16()?;
@@ -116,7 +131,10 @@ mod tests {
         assert_eq!(h.color_depth, ColorDepth::Rgba);
         assert!(h.layer_opacity_valid());
         assert!(!h.group_blend_valid());
-        assert_eq!(h.transparent_index, 0, "transparent index zeroed for non-indexed");
+        assert_eq!(
+            h.transparent_index, 0,
+            "transparent index zeroed for non-indexed"
+        );
         assert_eq!(h.num_colors, 256, "0 colors means 256");
         assert_eq!(h.pixel_ratio, (1, 1));
         assert_eq!(r.pos(), HEADER_SIZE, "reader left at first frame");
@@ -136,7 +154,14 @@ mod tests {
         let mut bytes = header_bytes();
         bytes[4..6].copy_from_slice(&0xA5E1u16.to_le_bytes());
         let err = parse_header(&mut Reader::new(&bytes)).unwrap_err();
-        assert_eq!(err, ParseError::BadMagic { offset: 4, expected: FILE_MAGIC, found: 0xA5E1 });
+        assert_eq!(
+            err,
+            ParseError::BadMagic {
+                offset: 4,
+                expected: FILE_MAGIC,
+                found: 0xA5E1
+            }
+        );
     }
 
     #[test]
@@ -153,6 +178,9 @@ mod tests {
     fn rejects_truncated_header() {
         let bytes = header_bytes();
         let mut r = Reader::new(&bytes[..100]);
-        assert!(matches!(parse_header(&mut r), Err(ParseError::UnexpectedEof { .. })));
+        assert!(matches!(
+            parse_header(&mut r),
+            Err(ParseError::UnexpectedEof { .. })
+        ));
     }
 }

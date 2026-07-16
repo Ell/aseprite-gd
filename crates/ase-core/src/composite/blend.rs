@@ -25,7 +25,12 @@ fn div_un8(a: i32, b: i32) -> i32 {
 /// Straight-alpha "over" — the final step of every mode (§9.2).
 pub fn blender_normal(back: Rgba, src: Rgba, opacity: i32) -> Rgba {
     if back[3] == 0 {
-        return [src[0], src[1], src[2], mul_un8(src[3] as i32, opacity) as u8];
+        return [
+            src[0],
+            src[1],
+            src[2],
+            mul_un8(src[3] as i32, opacity) as u8,
+        ];
     }
     if src[3] == 0 {
         return back;
@@ -34,7 +39,12 @@ pub fn blender_normal(back: Rgba, src: Rgba, opacity: i32) -> Rgba {
     let sa = mul_un8(src[3] as i32, opacity);
     let ra = sa + ba - mul_un8(ba, sa);
     let ch = |b: u8, s: u8| (b as i32 + (s as i32 - b as i32) * sa / ra) as u8;
-    [ch(back[0], src[0]), ch(back[1], src[1]), ch(back[2], src[2]), ra as u8]
+    [
+        ch(back[0], src[0]),
+        ch(back[1], src[1]),
+        ch(back[2], src[2]),
+        ra as u8,
+    ]
 }
 
 /// Per-channel lerp by opacity, alpha lerped too (used by the `_n` blenders;
@@ -47,7 +57,11 @@ fn blender_merge(back: Rgba, src: Rgba, opacity: i32) -> Rgba {
         (back[0] as i32, back[1] as i32, back[2] as i32)
     } else {
         let ch = |b: u8, s: u8| b as i32 + mul_un8(s as i32 - b as i32, opacity);
-        (ch(back[0], src[0]), ch(back[1], src[1]), ch(back[2], src[2]))
+        (
+            ch(back[0], src[0]),
+            ch(back[1], src[1]),
+            ch(back[2], src[2]),
+        )
     };
     let ra = ba + mul_un8(sa - ba, opacity);
     if ra == 0 {
@@ -66,7 +80,11 @@ fn b_screen(b: i32, s: i32) -> i32 {
     b + s - mul_un8(b, s)
 }
 fn b_hard_light(b: i32, s: i32) -> i32 {
-    if s < 128 { b_multiply(b, s << 1) } else { b_screen(b, (s << 1) - 255) }
+    if s < 128 {
+        b_multiply(b, s << 1)
+    } else {
+        b_screen(b, (s << 1) - 255)
+    }
 }
 fn b_overlay(b: i32, s: i32) -> i32 {
     b_hard_light(s, b)
@@ -95,8 +113,16 @@ fn b_soft_light(b: i32, s: i32) -> i32 {
     // W3C soft light in doubles, rounding as upstream (§9.3).
     let b = b as f64 / 255.0;
     let s = s as f64 / 255.0;
-    let d = if b <= 0.25 { ((16.0 * b - 12.0) * b + 4.0) * b } else { b.sqrt() };
-    let r = if s <= 0.5 { b - (1.0 - 2.0 * s) * b * (1.0 - b) } else { b + (2.0 * s - 1.0) * (d - b) };
+    let d = if b <= 0.25 {
+        ((16.0 * b - 12.0) * b + 4.0) * b
+    } else {
+        b.sqrt()
+    };
+    let r = if s <= 0.5 {
+        b - (1.0 - 2.0 * s) * b * (1.0 - b)
+    } else {
+        b + (2.0 * s - 1.0) * (d - b)
+    };
     (r * 255.0 + 0.5) as i32
 }
 fn b_difference(b: i32, s: i32) -> i32 {
@@ -171,8 +197,16 @@ fn set_sat(r: &mut f64, g: &mut f64, b: &mut f64, s: f64) {
 }
 
 fn hsl_blend(mode: BlendMode, back: Rgba, src: Rgba) -> [u8; 3] {
-    let (br, bg, bb) = (back[0] as f64 / 255.0, back[1] as f64 / 255.0, back[2] as f64 / 255.0);
-    let (mut r, mut g, mut b) = (src[0] as f64 / 255.0, src[1] as f64 / 255.0, src[2] as f64 / 255.0);
+    let (br, bg, bb) = (
+        back[0] as f64 / 255.0,
+        back[1] as f64 / 255.0,
+        back[2] as f64 / 255.0,
+    );
+    let (mut r, mut g, mut b) = (
+        src[0] as f64 / 255.0,
+        src[1] as f64 / 255.0,
+        src[2] as f64 / 255.0,
+    );
     match mode {
         BlendMode::HslHue => {
             let (s, l) = (sat(br, bg, bb), lum(br, bg, bb));
@@ -228,7 +262,11 @@ fn blender_legacy(mode: BlendMode, back: Rgba, src: Rgba, opacity: i32) -> Rgba 
                 _ => unreachable!(),
             };
             let ch = |b: u8, s: u8| f(b as i32, s as i32) as u8;
-            [ch(back[0], src[0]), ch(back[1], src[1]), ch(back[2], src[2])]
+            [
+                ch(back[0], src[0]),
+                ch(back[1], src[1]),
+                ch(back[2], src[2]),
+            ]
         }
     };
     blender_normal(back, [rgb[0], rgb[1], rgb[2], src[3]], opacity)
@@ -285,7 +323,11 @@ mod tests {
         // With Ba=255 the _n merges collapse to the legacy result (§9.4).
         let back = [100, 150, 200, 255];
         let src = [50, 60, 70, 200];
-        for mode in [BlendMode::Multiply, BlendMode::Screen, BlendMode::Difference] {
+        for mode in [
+            BlendMode::Multiply,
+            BlendMode::Screen,
+            BlendMode::Difference,
+        ] {
             assert_eq!(
                 blend(mode, back, src, 255),
                 blender_legacy(mode, back, src, 255),
@@ -296,7 +338,12 @@ mod tests {
 
     #[test]
     fn multiply_on_opaque_matches_hand_math() {
-        let r = blend(BlendMode::Multiply, [100, 100, 100, 255], [128, 255, 0, 255], 255);
+        let r = blend(
+            BlendMode::Multiply,
+            [100, 100, 100, 255],
+            [128, 255, 0, 255],
+            255,
+        );
         assert_eq!(r, [mul_un8(100, 128) as u8, 100, 0, 255]);
     }
 }

@@ -2,11 +2,11 @@
 
 use miniz_oxide::inflate::decompress_to_vec_zlib_with_limit;
 
+use crate::Result;
 use crate::error::ParseError;
 use crate::limits::{MAX_IMAGE_BYTES, MAX_TOTAL_DECOMPRESSED_BYTES};
 use crate::model::{Cel, CelContent, CelImage, CelTilemap, ColorDepth, Tile};
 use crate::read::Reader;
-use crate::Result;
 
 /// Running decompression budget across one file (zip-bomb guard).
 #[derive(Default)]
@@ -17,11 +17,17 @@ pub struct InflateBudget {
 impl InflateBudget {
     fn charge(&mut self, offset: usize, bytes: usize) -> Result<()> {
         if bytes > MAX_IMAGE_BYTES {
-            return Err(ParseError::LimitExceeded { offset, what: "cel image size" });
+            return Err(ParseError::LimitExceeded {
+                offset,
+                what: "cel image size",
+            });
         }
         self.total += bytes;
         if self.total > MAX_TOTAL_DECOMPRESSED_BYTES {
-            return Err(ParseError::LimitExceeded { offset, what: "total decompressed size" });
+            return Err(ParseError::LimitExceeded {
+                offset,
+                what: "total decompressed size",
+            });
         }
         Ok(())
     }
@@ -37,10 +43,17 @@ pub fn inflate_exact(
     let offset = r.pos();
     budget.charge(offset, expected)?;
     let compressed = r.bytes(chunk_end - offset)?;
-    let out = decompress_to_vec_zlib_with_limit(compressed, expected)
-        .map_err(|_| ParseError::Invalid { offset, what: "zlib stream" })?;
+    let out = decompress_to_vec_zlib_with_limit(compressed, expected).map_err(|_| {
+        ParseError::Invalid {
+            offset,
+            what: "zlib stream",
+        }
+    })?;
     if out.len() != expected {
-        return Err(ParseError::Invalid { offset, what: "decompressed size" });
+        return Err(ParseError::Invalid {
+            offset,
+            what: "decompressed size",
+        });
     }
     Ok(out)
 }
@@ -79,7 +92,11 @@ pub fn parse_cel(
             }
             let len = width as usize * height as usize * depth.bytes_per_pixel();
             budget.charge(r.pos(), len)?;
-            CelContent::Image(CelImage { width, height, pixels: r.bytes(len)?.to_vec() })
+            CelContent::Image(CelImage {
+                width,
+                height,
+                pixels: r.bytes(len)?.to_vec(),
+            })
         }
         1 => CelContent::Linked(r.u16()?),
         2 => {
@@ -90,7 +107,11 @@ pub fn parse_cel(
             }
             let len = width as usize * height as usize * depth.bytes_per_pixel();
             let pixels = inflate_exact(r, chunk_end, len, budget)?;
-            CelContent::Image(CelImage { width, height, pixels })
+            CelContent::Image(CelImage {
+                width,
+                height,
+                pixels,
+            })
         }
         3 => {
             let width = r.u16()?;
@@ -99,7 +120,10 @@ pub fn parse_cel(
             let bits_per_tile = r.u16()?;
             // Only 32-bit tiles were ever shipped (gotcha #15).
             if bits_per_tile != 32 {
-                return Err(ParseError::Invalid { offset: bits_offset, what: "bits per tile" });
+                return Err(ParseError::Invalid {
+                    offset: bits_offset,
+                    what: "bits per tile",
+                });
             }
             let id_mask = r.u32()?;
             let x_mask = r.u32()?;
@@ -117,17 +141,39 @@ pub fn parse_cel(
                 .map(|c| {
                     let t = u32::from_le_bytes([c[0], c[1], c[2], c[3]]);
                     Tile {
-                        index: if id_mask == 0 { 0 } else { (t & id_mask) >> shift },
+                        index: if id_mask == 0 {
+                            0
+                        } else {
+                            (t & id_mask) >> shift
+                        },
                         x_flip: x_mask != 0 && (t & x_mask) == x_mask,
                         y_flip: y_mask != 0 && (t & y_mask) == y_mask,
                         d_flip: d_mask != 0 && (t & d_mask) == d_mask,
                     }
                 })
                 .collect();
-            CelContent::Tilemap(CelTilemap { width, height, tiles })
+            CelContent::Tilemap(CelTilemap {
+                width,
+                height,
+                tiles,
+            })
         }
-        _ => return Err(ParseError::Invalid { offset: start, what: "cel type" }),
+        _ => {
+            return Err(ParseError::Invalid {
+                offset: start,
+                what: "cel type",
+            });
+        }
     };
 
-    Ok(Some(Cel { layer_index, x, y, opacity, z_index, content, extra: None, user_data: Default::default() }))
+    Ok(Some(Cel {
+        layer_index,
+        x,
+        y,
+        opacity,
+        z_index,
+        content,
+        extra: None,
+        user_data: Default::default(),
+    }))
 }

@@ -6,8 +6,8 @@
 
 use std::process::ExitCode;
 
-use ase_core::composite::render_frame;
 use ase_core::AseFile;
+use ase_core::composite::render_frame;
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().collect();
@@ -41,7 +41,10 @@ fn info(path: &str) -> ExitCode {
     let h = &file.header;
 
     println!("{path}");
-    println!("  canvas:     {}x{} ({:?})", h.width, h.height, h.color_depth);
+    println!(
+        "  canvas:     {}x{} ({:?})",
+        h.width, h.height, h.color_depth
+    );
     println!("  frames:     {}", file.frames.len());
     println!(
         "  palette:    {} entries",
@@ -63,7 +66,11 @@ fn info(path: &str) -> ExitCode {
             l.blend_mode,
             l.opacity,
             if l.is_visible() { "" } else { " (hidden)" },
-            if l.is_background() { " (background)" } else { "" },
+            if l.is_background() {
+                " (background)"
+            } else {
+                ""
+            },
         );
     }
     if !file.tags.is_empty() {
@@ -91,7 +98,11 @@ fn info(path: &str) -> ExitCode {
         );
     }
     for (i, f) in file.frames.iter().enumerate() {
-        println!("  frame {i:>3}:  {} cels, {} ms", f.cels.len(), f.duration_ms);
+        println!(
+            "  frame {i:>3}:  {} cels, {} ms",
+            f.cels.len(),
+            f.duration_ms
+        );
     }
     ExitCode::SUCCESS
 }

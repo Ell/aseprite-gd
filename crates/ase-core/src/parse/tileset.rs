@@ -1,10 +1,10 @@
 //! Tileset chunk 0x2023 (§6.13).
 
+use crate::Result;
 use crate::error::ParseError;
 use crate::model::{ColorDepth, Tileset};
-use crate::parse::cel::{inflate_exact, InflateBudget};
+use crate::parse::cel::{InflateBudget, inflate_exact};
 use crate::read::Reader;
-use crate::Result;
 
 pub fn parse_tileset(
     r: &mut Reader,
@@ -18,7 +18,10 @@ pub fn parse_tileset(
     let tile_width = r.u16()?;
     let tile_height = r.u16()?;
     if tile_width == 0 || tile_height == 0 {
-        return Err(ParseError::Invalid { offset: start, what: "tileset tile size" });
+        return Err(ParseError::Invalid {
+            offset: start,
+            what: "tileset tile size",
+        });
     }
     let base_index = r.i16()?;
     r.skip(14)?;

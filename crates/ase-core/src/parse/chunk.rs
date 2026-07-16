@@ -2,9 +2,9 @@
 //! unknown chunk types and unread trailing fields are skipped by construction
 //! (gotchas #1, #23).
 
+use crate::Result;
 use crate::error::ParseError;
 use crate::read::Reader;
-use crate::Result;
 
 /// Known chunk type IDs (§5).
 pub mod types {
@@ -47,13 +47,22 @@ pub fn parse_chunk_header(r: &mut Reader, frame_end: usize) -> Result<ChunkHeade
     let size = r.u32()?;
     let kind = r.u16()?;
     if size < 6 {
-        return Err(ParseError::Invalid { offset, what: "chunk size (< 6 bytes)" });
+        return Err(ParseError::Invalid {
+            offset,
+            what: "chunk size (< 6 bytes)",
+        });
     }
     let end = offset
         .checked_add(size as usize)
-        .ok_or(ParseError::Invalid { offset, what: "chunk size (overflow)" })?;
+        .ok_or(ParseError::Invalid {
+            offset,
+            what: "chunk size (overflow)",
+        })?;
     if end > frame_end {
-        return Err(ParseError::Invalid { offset, what: "chunk size (overruns frame)" });
+        return Err(ParseError::Invalid {
+            offset,
+            what: "chunk size (overruns frame)",
+        });
     }
     Ok(ChunkHeader { offset, size, kind })
 }
