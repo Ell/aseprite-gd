@@ -14,3 +14,9 @@ ase-core = { path = "crates/ase-core" }
 [profile.dev.package."*"]
 # gdext codegen is slow unoptimized; keep deps optimized even in dev
 opt-level = 2
+
+[profile.release]
+# Shipped in the addon zip: keep the cdylibs lean.
+strip = "symbols"
+lto = "thin"
+codegen-units = 1
