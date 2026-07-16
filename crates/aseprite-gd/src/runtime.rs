@@ -51,17 +51,28 @@ impl AseDocument {
 
     #[func]
     fn get_frame_duration_ms(&self, frame: i64) -> i64 {
-        self.file().frames.get(frame as usize).map_or(0, |f| f.duration_ms as i64)
+        self.file()
+            .frames
+            .get(frame as usize)
+            .map_or(0, |f| f.duration_ms as i64)
     }
 
     #[func]
     fn get_layer_names(&self) -> PackedStringArray {
-        self.file().layers.iter().map(|l| GString::from(l.name.as_str())).collect()
+        self.file()
+            .layers
+            .iter()
+            .map(|l| GString::from(l.name.as_str()))
+            .collect()
     }
 
     #[func]
     fn get_tag_names(&self) -> PackedStringArray {
-        self.file().tags.iter().map(|t| GString::from(t.name.as_str())).collect()
+        self.file()
+            .tags
+            .iter()
+            .map(|t| GString::from(t.name.as_str()))
+            .collect()
     }
 
     /// Tag frame range as (from, to), inclusive. (-1, -1) if unknown.
