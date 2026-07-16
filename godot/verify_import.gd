@@ -96,6 +96,22 @@ func _init():
             and ctex.normal_texture.get_image().get_pixel(8, 8) == Color(128 / 255.0, 128 / 255.0, 1.0)
         print("canvas_texture: diffuse=", ctex.diffuse_texture != null, " normal=", ctex.normal_texture != null, " ok=", ct_ok)
 
-    var ok = tex is Texture2D and sf is SpriteFrames and sf.get_animation_names().size() == 3 and doc_ok and atlas_ok and lib_ok and tset_ok and sb_ok and custom_ok and rt_ok and ct_ok
+    # Slice metadata via the runtime API (hitboxes, pivots, 9-patch info).
+    var sdoc = AseDocument.open("res://sprites/slices.aseprite")
+    var slices_ok = false
+    if sdoc != null:
+        var slices = sdoc.get_slices(0)
+        var panel = null
+        for sl in slices:
+            if sl["name"] == "panel":
+                panel = sl
+        slices_ok = slices.size() == 2 and panel != null \
+            and panel["rect"] == Rect2i(4, 4, 24, 16) \
+            and panel["center"] == Rect2i(8, 8, 8, 4) \
+            and panel["pivot"] == Vector2i(2, 3) \
+            and panel["text"] == "nine"
+        print("slices_api: ", slices.size(), " entries ok=", slices_ok)
+
+    var ok = tex is Texture2D and sf is SpriteFrames and sf.get_animation_names().size() == 3 and doc_ok and atlas_ok and lib_ok and tset_ok and sb_ok and custom_ok and rt_ok and ct_ok and slices_ok
     print("VERIFY: ", "PASS" if ok else "FAIL")
     quit(0 if ok else 1)

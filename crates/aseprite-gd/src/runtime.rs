@@ -103,6 +103,49 @@ impl AseDocument {
         d
     }
 
+    /// All slices with the key in effect at `frame`. Each entry:
+    /// {"name", "rect": Rect2i, "center": Rect2i (9-patch only),
+    ///  "pivot": Vector2i (if set), "text": String (if set)}.
+    /// Slices hidden at this frame are omitted.
+    #[func]
+    fn get_slices(&self, frame: i64) -> godot::builtin::VarArray {
+        use godot::builtin::{Rect2i, Vector2i};
+        let mut out = godot::builtin::VarArray::new();
+        for slice in &self.file().slices {
+            let Some(key) = slice.key_for(frame.max(0) as u32) else {
+                continue;
+            };
+            if key.width == 0 || key.height == 0 {
+                continue; // hidden from this frame on (§6.12)
+            }
+            let mut d = VarDictionary::new();
+            d.set(&"name".to_variant(), &slice.name.as_str().to_variant());
+            d.set(
+                &"rect".to_variant(),
+                &Rect2i::new(
+                    Vector2i::new(key.x, key.y),
+                    Vector2i::new(key.width as i32, key.height as i32),
+                )
+                .to_variant(),
+            );
+            if let Some((cx, cy, cw, ch)) = key.center {
+                d.set(
+                    &"center".to_variant(),
+                    &Rect2i::new(Vector2i::new(cx, cy), Vector2i::new(cw as i32, ch as i32))
+                        .to_variant(),
+                );
+            }
+            if let Some((px, py)) = key.pivot {
+                d.set(&"pivot".to_variant(), &Vector2i::new(px, py).to_variant());
+            }
+            if let Some(text) = &slice.user_data.text {
+                d.set(&"text".to_variant(), &text.as_str().to_variant());
+            }
+            out.push(&d.to_variant());
+        }
+        out
+    }
+
     /// Flattens one frame to an Image (RGBA8), exactly as Aseprite renders it.
     #[func]
     fn render_frame(&self, frame: i64) -> Option<Gd<Image>> {
