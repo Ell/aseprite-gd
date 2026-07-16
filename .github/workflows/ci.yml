@@ -99,3 +99,8 @@ jobs:
             echo "::error::GDExtension failed to load during import" >&2
             exit 1
           fi
+      - name: verify imported resources
+        shell: bash
+        run: |
+          godot --headless --path godot --script verify_import.gd 2>&1 | tee verify.log
+          grep -q "VERIFY: PASS" verify.log
