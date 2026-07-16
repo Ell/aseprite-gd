@@ -35,6 +35,7 @@ teammates' machines, and in headless CI.
 - [Getting started](docs/getting-started.md) — install, first import, importer overview
 - [Importer walkthroughs](docs/importers/) — one guide per import product
 - [Cookbook](docs/cookbook.md) — short task-oriented recipes
+- [Aseprite conventions](docs/aseprite-conventions.md) — everything the extension reads from your art files
 - [TileSet workflow](docs/tileset-workflow.md) — collision/terrain that survives reimports
 - [Runtime API](docs/runtime-api.md) — `AseDocument`, runtime `load()`, TileSet sync
 - [Troubleshooting](docs/troubleshooting.md)

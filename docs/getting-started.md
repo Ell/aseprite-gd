@@ -52,7 +52,9 @@ Each importer has a guide under [importers/](importers/):
 [stylebox](importers/stylebox.md),
 [canvas-texture](importers/canvas-texture.md).
 
-Shorter task-oriented recipes live in the [cookbook](cookbook.md). Working
+Shorter task-oriented recipes live in the [cookbook](cookbook.md), and
+[aseprite-conventions.md](aseprite-conventions.md) lists everything the
+extension reads from your art files. Working
 example scenes are in the repository's demo project under `godot/examples/`.
 
 ## Options common to all importers
