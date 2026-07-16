@@ -92,7 +92,7 @@ impl IEditorImportPlugin for AseTextureImporter {
             .get(&"frame".to_variant())
             .map(|v| v.to::<i64>().max(0) as usize)
             .unwrap_or(0)
-            .min(file.frames.len() - 1);
+            .min(file.frames.len().saturating_sub(1));
 
         let texture = match convert::texture_for_frame(&file, frame) {
             Ok(t) => t,

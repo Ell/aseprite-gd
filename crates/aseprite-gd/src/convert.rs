@@ -16,7 +16,8 @@ use godot::prelude::*;
 
 /// Options shared by the importers.
 pub struct ConvertOptions {
-    /// Case-sensitive substring match against layer names; matches are hidden.
+    /// Comma-separated, case-sensitive substrings; layers whose names contain
+    /// any of them are hidden.
     pub exclude_layers: String,
     /// Render layers that are hidden in Aseprite too.
     pub include_hidden_layers: bool,
@@ -43,7 +44,13 @@ impl ConvertOptions {
             if self.include_hidden_layers {
                 layer.flags |= 1;
             }
-            if !self.exclude_layers.is_empty() && layer.name.contains(&self.exclude_layers) {
+            let excluded = self
+                .exclude_layers
+                .split(',')
+                .map(str::trim)
+                .filter(|p| !p.is_empty())
+                .any(|p| layer.name.contains(p));
+            if excluded {
                 layer.flags &= !1;
             }
         }
@@ -631,4 +638,55 @@ pub fn build_canvas_texture(
         ct.set_specular_texture(&s.upcast::<Texture2D>());
     }
     Ok(ct)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ConvertOptions;
+
+    fn fixture() -> ase_core::AseFile {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../ase-core/tests/fixtures/generated/group_blend.aseprite"
+        );
+        ase_core::AseFile::parse(&std::fs::read(path).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn exclude_layers_takes_a_comma_separated_list() {
+        let file = fixture(); // layers: base, fx (group), inner_normal, inner_addition
+        let opts = ConvertOptions {
+            exclude_layers: "inner_normal, inner_addition".to_string(),
+            include_hidden_layers: false,
+        };
+        let out = opts.apply(&file);
+        let vis: Vec<(&str, bool)> = out
+            .layers
+            .iter()
+            .map(|l| (l.name.as_str(), l.is_visible()))
+            .collect();
+        assert_eq!(
+            vis,
+            vec![
+                ("base", true),
+                ("fx", true),
+                ("inner_normal", false),
+                ("inner_addition", false)
+            ]
+        );
+
+        // Single pattern still works; empty string excludes nothing.
+        let one = ConvertOptions {
+            exclude_layers: "addition".into(),
+            include_hidden_layers: false,
+        }
+        .apply(&file);
+        assert!(one.layers[2].is_visible() && !one.layers[3].is_visible());
+        let none = ConvertOptions {
+            exclude_layers: "".into(),
+            include_hidden_layers: false,
+        }
+        .apply(&file);
+        assert!(none.layers.iter().all(|l| l.is_visible()));
+    }
 }

@@ -100,7 +100,7 @@ impl IEditorImportPlugin for AseStyleBoxImporter {
             .get(&"frame".to_variant())
             .map(|v| v.to::<i64>().max(0) as usize)
             .unwrap_or(0)
-            .min(file.frames.len() - 1);
+            .min(file.frames.len().saturating_sub(1));
 
         let library = match convert::build_stylebox(&file, &slice_name, frame) {
             Ok(l) => l,

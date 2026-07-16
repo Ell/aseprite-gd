@@ -18,7 +18,7 @@ theme.
 
 | Option | Default | Effect |
 |---|---|---|
-| `exclude_layers` | `""` | Case-sensitive substring matched against layer names; matching layers are hidden, including layers revealed by `include_hidden_layers`. Empty disables the filter. |
+| `exclude_layers` | `""` | Comma-separated, case-sensitive substrings; layers whose names contain any of them are hidden, including layers revealed by `include_hidden_layers`. Empty disables the filter. |
 | `include_hidden_layers` | `false` | Also render layers that are hidden in Aseprite. |
 | `slice_name` | `""` | Which slice to import, by exact name. Empty selects the first slice that has a 9-slices center. |
 | `frame` | `0` | Which frame to render and take the slice key from. Values past the last frame clamp to the last frame. |

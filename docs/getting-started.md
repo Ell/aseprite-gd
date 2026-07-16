@@ -61,7 +61,7 @@ example scenes are in the repository's demo project under `godot/examples/`.
 
 | Option | Default | Effect |
 |---|---|---|
-| `exclude_layers` | `""` | Case-sensitive substring; layers whose names contain it are hidden for this import |
+| `exclude_layers` | `""` | Comma-separated, case-sensitive substrings; layers whose names contain any of them are hidden for this import |
 | `include_hidden_layers` | `false` | Render layers that are hidden in Aseprite too |
 
 ## Scripting and runtime loading

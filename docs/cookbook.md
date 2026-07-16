@@ -55,7 +55,7 @@ each other.
 
 ## Layer filtering
 
-All importers support `exclude_layers` (substring match; matching layers are
+All importers support `exclude_layers` (comma-separated substrings; matching layers are
 hidden) and `include_hidden_layers`. Useful for guide/reference layers or
 alternate outfits.
 

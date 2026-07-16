@@ -17,7 +17,7 @@ and specular maps. Everything stays in one file, in perfect registration.
 
 | Option | Default | Effect |
 |---|---|---|
-| `exclude_layers` | `""` | Case-sensitive substring matched against layer names; matching layers are hidden, including layers revealed by `include_hidden_layers`. Empty disables the filter. |
+| `exclude_layers` | `""` | Comma-separated, case-sensitive substrings; layers whose names contain any of them are hidden, including layers revealed by `include_hidden_layers`. Empty disables the filter. |
 | `include_hidden_layers` | `false` | Also render layers that are hidden in Aseprite. |
 | `frame` | `0` | Which frame to composite. Values past the last frame clamp to the last frame. |
 
