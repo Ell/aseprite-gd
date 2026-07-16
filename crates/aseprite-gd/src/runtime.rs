@@ -217,3 +217,32 @@ impl godot::classes::IResourceFormatLoader for AseResourceLoader {
         }
     }
 }
+
+/// Editor-side helper: updates a user-owned TileSet from an Aseprite file,
+/// preserving everything authored in Godot (collision, terrain, navigation).
+/// See docs/tileset-workflow.md.
+#[derive(GodotClass)]
+#[class(tool, init, base=RefCounted)]
+pub struct AseTilesetSync {
+    base: Base<RefCounted>,
+}
+
+#[godot_api]
+impl AseTilesetSync {
+    /// Syncs sources from `path` into `tile_set` in place. Returns the number
+    /// of sources synced (0 on failure, with details logged).
+    #[func]
+    fn sync(tile_set: Option<Gd<godot::classes::TileSet>>, path: GString) -> i64 {
+        let Some(mut tile_set) = tile_set else {
+            godot_error!("AseTilesetSync.sync: tile_set is null");
+            return 0;
+        };
+        match convert::load_ase(&path).and_then(|f| convert::sync_tileset_into(&f, &mut tile_set)) {
+            Ok(n) => n as i64,
+            Err(e) => {
+                godot_error!("AseTilesetSync.sync: {path}: {e}");
+                0
+            }
+        }
+    }
+}

@@ -297,84 +297,127 @@ pub fn load_ase(path: &GString) -> Result<AseFile, String> {
     AseFile::parse(bytes.as_slice()).map_err(|e| e.to_string())
 }
 
-/// Builds a Godot TileSet from the file's tilesets: one TileSetAtlasSource
-/// per Aseprite tileset (source id = tileset id), tiles laid out in a
-/// near-square grid. The empty tile (id 0 in release-format files) is not
-/// emitted. Per-tile user-data text lands in an "aseprite_text" custom data
-/// layer. Cell flips need no alternative tiles: Godot cells carry
-/// flip/transpose bits natively.
-pub fn build_tileset(file: &AseFile) -> Result<Gd<TileSet>, String> {
+/// Fixed sheet column count. A constant layout keeps tile atlas coords
+/// stable as the artist adds tiles, so per-tile data on synced TileSets
+/// survives growth (index i -> coords (i % COLS, i / COLS) forever).
+pub const TILESET_COLS: usize = 16;
+
+/// Atlas coords of the i-th non-empty tile.
+pub fn tile_coords(i: usize) -> Vector2i {
+    Vector2i::new((i % TILESET_COLS) as i32, (i / TILESET_COLS) as i32)
+}
+
+/// Sheet texture for one Aseprite tileset: the vertical strip re-arranged
+/// into a TILESET_COLS-wide grid, empty tile skipped.
+fn tileset_sheet(
+    file: &AseFile,
+    ts: &ase_core::model::Tileset,
+) -> Result<Option<(Gd<ImageTexture>, usize, usize)>, String> {
     use ase_core::composite::tileset_strip_rgba;
+
+    let Some(rgba) = tileset_strip_rgba(file, ts) else {
+        return Ok(None); // external tileset
+    };
+    let (tw, th) = (ts.tile_width as usize, ts.tile_height as usize);
+    let start = if ts.zero_is_empty() { 1 } else { 0 };
+    let count = (ts.num_tiles as usize).saturating_sub(start);
+    if count == 0 {
+        return Ok(None);
+    }
+    let cols = count.min(TILESET_COLS);
+    let rows = count.div_ceil(TILESET_COLS);
+    let (sheet_w, sheet_h) = (cols * tw, rows * th);
+    let mut sheet = vec![0u8; sheet_w * sheet_h * 4];
+    for i in 0..count {
+        let src_tile = start + i;
+        let (cx, cy) = (i % TILESET_COLS, i / TILESET_COLS);
+        for row in 0..th {
+            let src = ((src_tile * th + row) * tw) * 4;
+            let dst = ((cy * th + row) * sheet_w + cx * tw) * 4;
+            sheet[dst..dst + tw * 4].copy_from_slice(&rgba[src..src + tw * 4]);
+        }
+    }
+    let data = PackedByteArray::from(sheet.as_slice());
+    let image =
+        Image::create_from_data(sheet_w as i32, sheet_h as i32, false, Format::RGBA8, &data)
+            .ok_or("tileset Image::create_from_data failed")?;
+    let texture = ImageTexture::create_from_image(&image)
+        .ok_or("tileset ImageTexture::create_from_image failed")?;
+    Ok(Some((texture, count, start)))
+}
+
+/// Ensures the "aseprite_text" custom data layer exists; returns its index.
+fn ensure_text_layer(tile_set: &mut Gd<TileSet>) -> i32 {
+    for i in 0..tile_set.get_custom_data_layers_count() {
+        if tile_set.get_custom_data_layer_name(i) == "aseprite_text" {
+            return i;
+        }
+    }
+    tile_set.add_custom_data_layer();
+    let idx = tile_set.get_custom_data_layers_count() - 1;
+    tile_set.set_custom_data_layer_name(idx, "aseprite_text");
+    tile_set.set_custom_data_layer_type(idx, VariantType::STRING);
+    idx
+}
+
+/// Syncs the file's tilesets into an existing TileSet, preserving everything
+/// the user authored (see docs/tileset-workflow.md): sources are matched by
+/// Aseprite tileset id and created when missing; surviving tiles keep their
+/// TileData; tiles no longer in the file are removed. Returns the number of
+/// sources synced.
+pub fn sync_tileset_into(file: &AseFile, tile_set: &mut Gd<TileSet>) -> Result<u32, String> {
     use godot::classes::{TileSetAtlasSource, TileSetSource};
 
-    let embedded: Vec<_> = file
+    let has_text = file
         .tilesets
-        .iter()
-        .filter(|t| t.pixels.is_some())
-        .collect();
-    if embedded.is_empty() {
-        return Err("no embedded tilesets in file".to_string());
-    }
-
-    let mut tile_set = TileSet::new_gd();
-    let first = embedded[0];
-    tile_set.set_tile_size(Vector2i::new(
-        first.tile_width as i32,
-        first.tile_height as i32,
-    ));
-
-    let has_text = embedded
         .iter()
         .any(|t| t.tile_user_data.iter().any(|u| u.text.is_some()));
     if has_text {
-        tile_set.add_custom_data_layer();
-        tile_set.set_custom_data_layer_name(0, "aseprite_text");
-        tile_set.set_custom_data_layer_type(0, VariantType::STRING);
+        ensure_text_layer(tile_set);
     }
 
-    for ts in embedded {
-        let rgba = tileset_strip_rgba(file, ts).expect("filtered to embedded");
-        let (tw, th) = (ts.tile_width as usize, ts.tile_height as usize);
-        let start = if ts.zero_is_empty() { 1 } else { 0 };
-        let count = (ts.num_tiles as usize).saturating_sub(start);
-        if count == 0 {
+    let mut synced = 0;
+    for ts in &file.tilesets {
+        let Some((texture, count, start)) = tileset_sheet(file, ts)? else {
             continue;
-        }
-        let cols = (count as f64).sqrt().ceil() as usize;
-        let rows = count.div_ceil(cols);
+        };
+        let (tw, th) = (ts.tile_width as i32, ts.tile_height as i32);
+        let id = ts.id as i32;
 
-        // Re-arrange the vertical strip into a cols x rows sheet.
-        let (sheet_w, sheet_h) = (cols * tw, rows * th);
-        let mut sheet = vec![0u8; sheet_w * sheet_h * 4];
-        for i in 0..count {
-            let src_tile = start + i;
-            let (cx, cy) = (i % cols, i / cols);
-            for row in 0..th {
-                let src = ((src_tile * th + row) * tw) * 4;
-                let dst = ((cy * th + row) * sheet_w + cx * tw) * 4;
-                sheet[dst..dst + tw * 4].copy_from_slice(&rgba[src..src + tw * 4]);
-            }
-        }
-
-        let data = PackedByteArray::from(sheet.as_slice());
-        let image =
-            Image::create_from_data(sheet_w as i32, sheet_h as i32, false, Format::RGBA8, &data)
-                .ok_or("tileset Image::create_from_data failed")?;
-        let texture = ImageTexture::create_from_image(&image)
-            .ok_or("tileset ImageTexture::create_from_image failed")?;
-
-        let mut source = TileSetAtlasSource::new_gd();
+        let mut source = if tile_set.has_source(id) {
+            tile_set
+                .get_source(id)
+                .and_then(|s| s.try_cast::<TileSetAtlasSource>().ok())
+                .ok_or_else(|| format!("TileSet source {id} exists but is not an atlas source"))?
+        } else {
+            let source = TileSetAtlasSource::new_gd();
+            tile_set
+                .add_source_ex(&source.clone().upcast::<TileSetSource>())
+                .atlas_source_id_override(id)
+                .done();
+            source
+        };
         source.set_texture(&texture);
-        source.set_texture_region_size(Vector2i::new(tw as i32, th as i32));
-        // The source must live inside the TileSet before TileData can accept
-        // custom data (the layer definitions live on the TileSet).
-        tile_set
-            .add_source_ex(&source.clone().upcast::<TileSetSource>())
-            .atlas_source_id_override(ts.id as i32)
-            .done();
+        source.set_texture_region_size(Vector2i::new(tw, th));
+
+        // Drop tiles that no longer exist in the file (their coords lie past
+        // the current tile count in the fixed-column layout).
+        let stale: Vec<Vector2i> = (0..source.get_tiles_count())
+            .map(|n| source.get_tile_id(n))
+            .filter(|c| {
+                let i = c.y as usize * TILESET_COLS + c.x as usize;
+                c.x as usize >= TILESET_COLS || i >= count
+            })
+            .collect();
+        for coords in stale {
+            source.remove_tile(coords);
+        }
+
         for i in 0..count {
-            let coords = Vector2i::new((i % cols) as i32, (i / cols) as i32);
-            source.create_tile(coords);
+            let coords = tile_coords(i);
+            if !source.has_tile(coords) {
+                source.create_tile(coords);
+            }
             if has_text
                 && let Some(ud) = ts.tile_user_data.get(start + i)
                 && let Some(text) = &ud.text
@@ -383,8 +426,30 @@ pub fn build_tileset(file: &AseFile) -> Result<Gd<TileSet>, String> {
                 td.set_custom_data("aseprite_text", &text.as_str().to_variant());
             }
         }
+        synced += 1;
     }
 
+    if synced == 0 {
+        return Err("no embedded tilesets in file".to_string());
+    }
+    Ok(synced)
+}
+
+/// Builds a fresh Godot TileSet (the import product; regenerated every
+/// reimport). For collision/terrain workflows use `sync_tileset_into` — see
+/// docs/tileset-workflow.md.
+pub fn build_tileset(file: &AseFile) -> Result<Gd<TileSet>, String> {
+    let first = file
+        .tilesets
+        .iter()
+        .find(|t| t.pixels.is_some())
+        .ok_or("no embedded tilesets in file")?;
+    let mut tile_set = TileSet::new_gd();
+    tile_set.set_tile_size(Vector2i::new(
+        first.tile_width as i32,
+        first.tile_height as i32,
+    ));
+    sync_tileset_into(file, &mut tile_set)?;
     Ok(tile_set)
 }
 

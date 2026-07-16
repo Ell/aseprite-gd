@@ -112,6 +112,22 @@ func _init():
             and panel["text"] == "nine"
         print("slices_api: ", slices.size(), " entries ok=", slices_ok)
 
-    var ok = tex is Texture2D and sf is SpriteFrames and sf.get_animation_names().size() == 3 and doc_ok and atlas_ok and lib_ok and tset_ok and sb_ok and custom_ok and rt_ok and ct_ok and slices_ok
+    # Reimport-safe sync: user-authored TileData survives a re-sync.
+    var owned := TileSet.new()
+    owned.add_physics_layer()
+    var sync_ok = false
+    if AseTilesetSync.sync(owned, "res://sprites/tile_flips.aseprite") == 1:
+        var src0: TileSetAtlasSource = owned.get_source(owned.get_source_id(0))
+        var td0 = src0.get_tile_data(Vector2i(0, 0), 0)
+        td0.add_collision_polygon(0)
+        td0.set_collision_polygon_points(0, 0, PackedVector2Array([Vector2(0, 0), Vector2(8, 0), Vector2(8, 8)]))
+        # second sync must keep the polygon and the aseprite custom data
+        AseTilesetSync.sync(owned, "res://sprites/tile_flips.aseprite")
+        var td1 = src0.get_tile_data(Vector2i(0, 0), 0)
+        sync_ok = td1.get_collision_polygons_count(0) == 1 \
+            and td1.get_custom_data("aseprite_text") == "solid"
+        print("tileset_sync: polygons=", td1.get_collision_polygons_count(0), " text=", td1.get_custom_data("aseprite_text"), " ok=", sync_ok)
+
+    var ok = tex is Texture2D and sf is SpriteFrames and sf.get_animation_names().size() == 3 and doc_ok and atlas_ok and lib_ok and tset_ok and sb_ok and custom_ok and rt_ok and ct_ok and slices_ok and sync_ok
     print("VERIFY: ", "PASS" if ok else "FAIL")
     quit(0 if ok else 1)
