@@ -37,7 +37,7 @@ teammates' machines, and in headless CI.
 - [Cookbook](docs/cookbook.md) — short task-oriented recipes
 - [Aseprite conventions](docs/aseprite-conventions.md) — everything the extension reads from your art files
 - [TileSet workflow](docs/tileset-workflow.md) — collision/terrain that survives reimports
-- [Editor tools](docs/editor-tools.md) — inspector import, animation preview, batch reimport
+- [Editor tools](docs/editor-tools.md) — inspector import, batch reimport
 - [Post-import hooks](docs/post-import-hooks.md) — reshape imports with your own scripts
 - [Runtime API](docs/runtime-api.md) — `AseDocument`, runtime `load()`, TileSet sync
 - [Troubleshooting](docs/troubleshooting.md)

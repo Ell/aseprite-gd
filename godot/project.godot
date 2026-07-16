@@ -1,13 +1,22 @@
-; Demo/test project for aseprite-gd. Opening this in Godot 4.2+ loads the
-; extension from ../target via the .gdextension file in addons/aseprite_gd.
-; Also the target of headless import integration tests in CI.
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
 
 config_version=5
+
+[animation]
+
+compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 
 [application]
 
 config/name="aseprite-gd demo"
-config/features=PackedStringArray("4.2")
+run/main_scene="res://examples/lit_sprite.tscn"
+config/features=PackedStringArray("4.7")
 
 [editor_plugins]
 

@@ -1,6 +1,6 @@
 # Editor tools
 
-Beyond the importers, the plugin adds three pieces of editor UI.
+Beyond the importers, the plugin adds two pieces of editor UI.
 
 ## Inspector import section
 
@@ -29,13 +29,6 @@ AseAnimationImport.merge_into_player(player, "res://hero.aseprite",
 AseAnimationImport.reimport(player)
 AseAnimationImport.assign_sprite_frames(sprite, "res://hero.aseprite", {})
 ```
-
-## Animation preview panel
-
-The "Aseprite" bottom panel plays any `.aseprite` file with its real frame
-timings: open a file (or drag one onto the panel), pick a tag, watch it
-loop. Rendering matches the importers exactly, so what you preview is what
-imports.
 
 ## Tools menu
 
