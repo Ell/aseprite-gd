@@ -141,5 +141,18 @@ func _init():
         print("slice_tracks: ok=", strk_ok)
 
     var ok = tex is Texture2D and sf is SpriteFrames and sf.get_animation_names().size() == 3 and doc_ok and atlas_ok and lib_ok and tset_ok and sb_ok and custom_ok and rt_ok and ct_ok and slices_ok and sync_ok and strk_ok
+    # Example scenes must instantiate with their imported resources wired up.
+    var scene_ok = true
+    for scene_path in ["res://examples/animated_character.tscn", "res://examples/ui_panel.tscn", "res://examples/lit_sprite.tscn", "res://examples/animation_player.tscn"]:
+        var ps = load(scene_path)
+        var inst = ps.instantiate() if ps != null else null
+        if inst == null:
+            scene_ok = false
+            print("example scene FAILED to load: ", scene_path)
+        else:
+            inst.free()
+    print("example_scenes: ok=", scene_ok)
+    ok = ok and scene_ok
+
     print("VERIFY: ", "PASS" if ok else "FAIL")
     quit(0 if ok else 1)

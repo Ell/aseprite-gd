@@ -1,0 +1,13 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Texture2D" path="res://sprites/lit_sprite.aseprite" id="1"]
+
+[node name="LitSprite" type="Node2D"]
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+texture = ExtResource("1")
+texture_filter = 1
+
+[node name="PointLight2D" type="PointLight2D" parent="."]
+position = Vector2(8, 0)
+energy = 1.5
