@@ -23,7 +23,12 @@ const ASEFILE_SKIP: &[&str] = &[
 
 /// Fixtures `aseprite-loader` 0.4.2 (`binary::file::parse_file`) fails to
 /// parse.
-const LOADER_SKIP: &[&str] = &[];
+const LOADER_SKIP: &[&str] = &[
+    // aseprite-loader rejects palettes with more than 256 entries
+    // (LastColorIndexOutOfBounds); the format allows them (spec §6.10) and we
+    // parse them fine.
+    "generated/big_palette.aseprite",
+];
 
 const FIXTURE_DIRS: &[&str] = &["aseprite-tests", "asefile", "generated"];
 

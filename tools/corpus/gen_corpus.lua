@@ -206,4 +206,19 @@ do
   spr:close()
 end
 
+-- Palette with more than 256 entries (0x2019 newPaletteSize is a DWORD;
+-- gotcha #9). RGB sprite so pixels don't need the palette.
+do
+  local spr = Sprite(8, 8, ColorMode.RGB)
+  spr.cels[1].image:drawImage(base_image(8, 8))
+  local pal = Palette(300)
+  for i = 0, 299 do
+    pal:setColor(i, Color { r = i % 256, g = (i * 3) % 256, b = (i * 7) % 256, a = 255 })
+  end
+  spr:setPalette(pal)
+  spr:saveAs(out .. "/big_palette.aseprite")
+  spr:saveCopyAs(out .. "/big_palette.png")
+  spr:close()
+end
+
 print("corpus written to " .. out)

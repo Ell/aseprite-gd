@@ -110,3 +110,21 @@ jobs:
         run: |
           godot --headless --path godot --script verify_import.gd 2>&1 | tee verify.log
           grep -q "VERIFY: PASS" verify.log
+
+  fuzz-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crates/ase-core/fuzz
+      - name: install cargo-fuzz
+        run: cargo install cargo-fuzz --locked
+      - name: fuzz parse and render (smoke budget)
+        working-directory: crates/ase-core
+        run: |
+          for target in parse render; do
+            cargo fuzz run "$target" -- -max_total_time=60 -seed_inputs=$(ls tests/fixtures/generated/*.aseprite | head -3 | tr '\n' ',' | sed 's/,$//')
+          done

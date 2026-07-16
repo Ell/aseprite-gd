@@ -114,3 +114,18 @@ fn slice_fixture_parses_center_pivot_and_user_data() {
     assert_eq!(panel.user_data.text.as_deref(), Some("nine"));
     assert!(f.slices.iter().any(|s| s.name == "hitbox"));
 }
+
+#[test]
+fn palettes_beyond_256_entries_parse() {
+    let f = load("generated/big_palette.aseprite");
+    assert_eq!(f.palette_for(0).entries.len(), 300);
+    assert_eq!(
+        f.palette_for(0).entries[299],
+        [
+            (299 % 256) as u8,
+            (299 * 3 % 256) as u8,
+            (299 * 7 % 256) as u8,
+            255
+        ]
+    );
+}
