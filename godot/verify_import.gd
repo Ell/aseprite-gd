@@ -67,6 +67,16 @@ func _init():
             and sb.get_texture_margin(SIDE_BOTTOM) == 4.0
         print("stylebox: tex=", sb.texture.get_size() if sb.texture else null, " margins=", [sb.get_texture_margin(SIDE_LEFT), sb.get_texture_margin(SIDE_TOP), sb.get_texture_margin(SIDE_RIGHT), sb.get_texture_margin(SIDE_BOTTOM)], " ok=", sb_ok)
 
-    var ok = tex is Texture2D and sf is SpriteFrames and sf.get_animation_names().size() == 3 and doc_ok and atlas_ok and lib_ok and tset_ok and sb_ok
+    # Per-tile user data -> "aseprite_text" custom data layer.
+    var tset2 = load("res://sprites/tile_flips.aseprite")
+    var custom_ok = false
+    if tset2 is TileSet and tset2.get_custom_data_layers_count() == 1:
+        var src2 = tset2.get_source(tset2.get_source_id(0))
+        var td = src2.get_tile_data(Vector2i(0, 0), 0)
+        custom_ok = tset2.get_custom_data_layer_name(0) == "aseprite_text" \
+            and td != null and td.get_custom_data("aseprite_text") == "solid"
+        print("tile_custom_data: ", td.get_custom_data("aseprite_text") if td else null, " ok=", custom_ok)
+
+    var ok = tex is Texture2D and sf is SpriteFrames and sf.get_animation_names().size() == 3 and doc_ok and atlas_ok and lib_ok and tset_ok and sb_ok and custom_ok
     print("VERIFY: ", "PASS" if ok else "FAIL")
     quit(0 if ok else 1)

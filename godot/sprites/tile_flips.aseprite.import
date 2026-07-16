@@ -1,0 +1,16 @@
+[remap]
+
+importer="aseprite_gd.tileset"
+type="TileSet"
+uid="uid://ttirq7s6mywj"
+path="res://.godot/imported/tile_flips.aseprite-7e3c2317b4a897d6885f1e849b5d6c3a.res"
+
+[deps]
+
+source_file="res://sprites/tile_flips.aseprite"
+dest_files=["res://.godot/imported/tile_flips.aseprite-7e3c2317b4a897d6885f1e849b5d6c3a.res"]
+
+[params]
+
+exclude_layers=""
+include_hidden_layers=false

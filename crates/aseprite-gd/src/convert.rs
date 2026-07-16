@@ -358,6 +358,12 @@ pub fn build_tileset(file: &AseFile) -> Result<Gd<TileSet>, String> {
         let mut source = TileSetAtlasSource::new_gd();
         source.set_texture(&texture);
         source.set_texture_region_size(Vector2i::new(tw as i32, th as i32));
+        // The source must live inside the TileSet before TileData can accept
+        // custom data (the layer definitions live on the TileSet).
+        tile_set
+            .add_source_ex(&source.clone().upcast::<TileSetSource>())
+            .atlas_source_id_override(ts.id as i32)
+            .done();
         for i in 0..count {
             let coords = Vector2i::new((i % cols) as i32, (i / cols) as i32);
             source.create_tile(coords);
@@ -369,10 +375,6 @@ pub fn build_tileset(file: &AseFile) -> Result<Gd<TileSet>, String> {
                 td.set_custom_data("aseprite_text", &text.as_str().to_variant());
             }
         }
-        tile_set
-            .add_source_ex(&source.upcast::<TileSetSource>())
-            .atlas_source_id_override(ts.id as i32)
-            .done();
     }
 
     Ok(tile_set)
