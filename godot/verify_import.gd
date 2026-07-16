@@ -128,6 +128,18 @@ func _init():
             and td1.get_custom_data("aseprite_text") == "solid"
         print("tileset_sync: polygons=", td1.get_collision_polygons_count(0), " text=", td1.get_custom_data("aseprite_text"), " ok=", sync_ok)
 
-    var ok = tex is Texture2D and sf is SpriteFrames and sf.get_animation_names().size() == 3 and doc_ok and atlas_ok and lib_ok and tset_ok and sb_ok and custom_ok and rt_ok and ct_ok and slices_ok and sync_ok
+    # Slice hitbox tracks: "<slice>:position"/":size" value tracks (opt-in).
+    var slib = load("res://sprites/slices_anim.aseprite")
+    var strk_ok = false
+    if slib is AnimationLibrary:
+        var sanim = slib.get_animation(slib.get_animation_list()[0])
+        var found_pos = false
+        for ti in sanim.get_track_count():
+            if String(sanim.track_get_path(ti)) == "panel:position" and sanim.track_get_key_count(ti) > 0:
+                found_pos = sanim.track_get_key_value(ti, 0) == Vector2(4, 4)
+        strk_ok = found_pos
+        print("slice_tracks: ok=", strk_ok)
+
+    var ok = tex is Texture2D and sf is SpriteFrames and sf.get_animation_names().size() == 3 and doc_ok and atlas_ok and lib_ok and tset_ok and sb_ok and custom_ok and rt_ok and ct_ok and slices_ok and sync_ok and strk_ok
     print("VERIFY: ", "PASS" if ok else "FAIL")
     quit(0 if ok else 1)

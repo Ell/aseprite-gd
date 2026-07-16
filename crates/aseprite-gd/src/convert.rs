@@ -223,6 +223,7 @@ pub fn build_sprite_frames(file: &AseFile) -> Result<Gd<SpriteFrames>, String> {
 pub fn build_animation_library(
     file: &AseFile,
     sprite_path: &str,
+    slice_tracks: bool,
 ) -> Result<Gd<AnimationLibrary>, String> {
     use godot::classes::animation::{LoopMode, TrackType, UpdateMode};
 
@@ -280,6 +281,49 @@ pub fn build_animation_library(
                 }
             }
             t_ms += file.frames[frame_index].duration_ms as u32;
+        }
+
+        // Opt-in: animate one child node per slice ("<slice name>:position"
+        // / ":size") — hitboxes/hurtboxes keyed from per-frame slice keys.
+        if slice_tracks {
+            for slice in &file.slices {
+                if slice.keys.is_empty() {
+                    continue;
+                }
+                let pos_track = anim.add_track(TrackType::VALUE);
+                anim.track_set_path(
+                    pos_track,
+                    &NodePath::from(format!("{}:position", slice.name).as_str()),
+                );
+                anim.value_track_set_update_mode(pos_track, UpdateMode::DISCRETE);
+                let size_track = anim.add_track(TrackType::VALUE);
+                anim.track_set_path(
+                    size_track,
+                    &NodePath::from(format!("{}:size", slice.name).as_str()),
+                );
+                anim.value_track_set_update_mode(size_track, UpdateMode::DISCRETE);
+
+                let mut t_ms: u32 = 0;
+                for &frame_index in &anim_def.order {
+                    let t = t_ms as f64 / 1000.0;
+                    if let Some(key) = slice.key_for(frame_index as u32)
+                        && key.width > 0
+                        && key.height > 0
+                    {
+                        anim.track_insert_key(
+                            pos_track,
+                            t,
+                            &Vector2::new(key.x as f32, key.y as f32).to_variant(),
+                        );
+                        anim.track_insert_key(
+                            size_track,
+                            t,
+                            &Vector2::new(key.width as f32, key.height as f32).to_variant(),
+                        );
+                    }
+                    t_ms += file.frames[frame_index].duration_ms as u32;
+                }
+            }
         }
 
         library.add_animation(&StringName::from(anim_def.name.as_str()), &anim);
