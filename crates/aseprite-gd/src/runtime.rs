@@ -127,3 +127,50 @@ impl AseDocument {
         }
     }
 }
+
+/// Runtime loader: makes plain `load("....aseprite")` work in running games
+/// (exported or `--script`), returning the composited first frame as an
+/// ImageTexture. Registered only outside the editor — in the editor the
+/// import pipeline owns these files. Loader methods may be called from
+/// background threads (gdext#597); this type is stateless.
+#[derive(GodotClass)]
+#[class(init, base=ResourceFormatLoader)]
+pub struct AseResourceLoader {
+    base: Base<godot::classes::ResourceFormatLoader>,
+}
+
+#[godot_api]
+impl godot::classes::IResourceFormatLoader for AseResourceLoader {
+    fn get_recognized_extensions(&self) -> PackedStringArray {
+        crate::import::recognized_extensions()
+    }
+
+    fn handles_type(&self, ty: StringName) -> bool {
+        ty == "Texture2D" || ty == "ImageTexture"
+    }
+
+    fn get_resource_type(&self, path: GString) -> GString {
+        let p = path.to_string().to_lowercase();
+        if p.ends_with(".aseprite") || p.ends_with(".ase") {
+            "ImageTexture".into()
+        } else {
+            "".into()
+        }
+    }
+
+    fn load(
+        &self,
+        path: GString,
+        _original_path: GString,
+        _use_sub_threads: bool,
+        _cache_mode: i32,
+    ) -> Variant {
+        match convert::load_ase(&path).and_then(|f| convert::texture_for_frame(&f, 0)) {
+            Ok(texture) => texture.to_variant(),
+            Err(e) => {
+                godot_error!("aseprite-gd runtime load: {path}: {e}");
+                (godot::global::Error::ERR_FILE_CORRUPT.ord() as i64).to_variant()
+            }
+        }
+    }
+}

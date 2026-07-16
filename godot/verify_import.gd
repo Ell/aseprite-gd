@@ -77,6 +77,16 @@ func _init():
             and td != null and td.get_custom_data("aseprite_text") == "solid"
         print("tile_custom_data: ", td.get_custom_data("aseprite_text") if td else null, " ok=", custom_ok)
 
-    var ok = tex is Texture2D and sf is SpriteFrames and sf.get_animation_names().size() == 3 and doc_ok and atlas_ok and lib_ok and tset_ok and sb_ok and custom_ok
+    # Runtime ResourceFormatLoader: plain load() of a raw .aseprite with no
+    # import pipeline involvement (game mode only).
+    var raw = FileAccess.get_file_as_bytes("res://sprites/blend_multiply.aseprite")
+    var fa = FileAccess.open("user://rt_test.aseprite", FileAccess.WRITE)
+    fa.store_buffer(raw)
+    fa.close()
+    var rt = load("user://rt_test.aseprite")
+    var rt_ok = rt is ImageTexture and rt.get_size() == Vector2(16, 16)
+    print("runtime_loader: ", rt, " ok=", rt_ok)
+
+    var ok = tex is Texture2D and sf is SpriteFrames and sf.get_animation_names().size() == 3 and doc_ok and atlas_ok and lib_ok and tset_ok and sb_ok and custom_ok and rt_ok
     print("VERIFY: ", "PASS" if ok else "FAIL")
     quit(0 if ok else 1)
