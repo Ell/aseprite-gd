@@ -76,4 +76,91 @@ for _, m in ipairs(modes) do
   spr:close()
 end
 
+-- Group blend/opacity: a group with its own blend mode + opacity containing
+-- children with non-normal blends. Exercises group buffers (§6.2 NOTE.6) —
+-- children must blend against the group's own backdrop, not the base layer.
+do
+  local spr = Sprite(16, 16, ColorMode.RGB)
+  spr.layers[1].name = "base"
+  spr.cels[1].image:drawImage(base_image(16, 16))
+
+  local grp = spr:newGroup()
+  grp.name = "fx"
+
+  local inner1 = spr:newLayer()
+  inner1.parent = grp
+  inner1.name = "inner_normal"
+  spr:newCel(inner1, 1, top_image(10, 10), Point(1, 1))
+
+  local inner2 = spr:newLayer()
+  inner2.parent = grp
+  inner2.name = "inner_addition"
+  inner2.blendMode = BlendMode.ADDITION
+  inner2.opacity = 180
+  spr:newCel(inner2, 1, top_image(10, 10), Point(5, 5))
+
+  grp.blendMode = BlendMode.MULTIPLY
+  grp.opacity = 160
+
+  spr:saveAs(out .. "/group_blend.aseprite")
+  spr:saveCopyAs(out .. "/group_blend.png")
+  spr:close()
+end
+
+-- Cel z-index: bottom layer's cel hops above the top layer's (§8 NOTE.5).
+do
+  local spr = Sprite(16, 16, ColorMode.RGB)
+  spr.layers[1].name = "low"
+  spr.cels[1].image:drawImage(base_image(16, 16))
+
+  local hi = spr:newLayer()
+  hi.name = "high"
+  spr:newCel(hi, 1, top_image(12, 12), Point(2, 2))
+
+  spr.layers[1]:cel(1).zIndex = 2
+  hi:cel(1).zIndex = -1
+
+  spr:saveAs(out .. "/zindex.aseprite")
+  spr:saveCopyAs(out .. "/zindex.png")
+  spr:close()
+end
+
+-- Tilemap with flipped tiles: X/Y/D flip bits on tile references (§6.3
+-- type 3). Tile 1 is asymmetric so every flip is visually distinct.
+do
+  local spr = Sprite(16, 16, ColorMode.RGB)
+  spr.layers[1].name = "base"
+  spr.cels[1].image:drawImage(base_image(16, 16))
+
+  app.command.NewLayer { tilemap = true, gridBounds = Rectangle(0, 0, 8, 8) }
+  local lay = spr.layers[#spr.layers]
+  local ts = lay.tileset
+
+  local tile = spr:newTile(ts)
+  local timg = Image(8, 8, ColorMode.RGB)
+  for y = 0, 7 do
+    for x = 0, 7 do
+      if x > y then
+        timg:putPixel(x, y, app.pixelColor.rgba(255, x * 30, 0, 255))
+      elseif x == y then
+        timg:putPixel(x, y, app.pixelColor.rgba(0, 0, 0, 0))
+      else
+        timg:putPixel(x, y, app.pixelColor.rgba(0, y * 30, 255, 255))
+      end
+    end
+  end
+  tile.image = timg
+
+  local grid = Image(2, 2, ColorMode.TILEMAP)
+  grid:putPixel(0, 0, 1) -- plain
+  grid:putPixel(1, 0, 1 | 0x80000000) -- x flip
+  grid:putPixel(0, 1, 1 | 0x40000000) -- y flip
+  grid:putPixel(1, 1, 1 | 0x20000000) -- d flip
+  spr:newCel(lay, 1, grid, Point(0, 0))
+
+  spr:saveAs(out .. "/tile_flips.aseprite")
+  spr:saveCopyAs(out .. "/tile_flips.png")
+  spr:close()
+end
+
 print("corpus written to " .. out)
