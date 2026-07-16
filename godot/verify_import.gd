@@ -182,6 +182,41 @@ func _init():
 
 
     var ok = tex is Texture2D and sf is SpriteFrames and sf.get_animation_names().size() == 3 and doc_ok and atlas_ok and lib_ok and tset_ok and sb_ok and custom_ok and rt_ok and ct_ok and slices_ok and sync_ok and strk_ok and hooks_ok and split_ok and opts_ok
+    # Non-destructive AnimationPlayer merge: hand-made tracks and animations
+    # survive re-import; imported tracks update without duplicating.
+    var player := AnimationPlayer.new()
+    var merge_opts = {"sprite_path": "Sprite2D"}
+    var n1 = AseAnimationImport.merge_into_player(player, "res://sprites/user_data.aseprite", merge_opts)
+    var mlib = player.get_animation_library("")
+    # user customizations: extra track on an imported anim + a hand-made anim
+    var tag0: Animation = mlib.get_animation("Tag 0")
+    var custom_track = tag0.add_track(Animation.TYPE_VALUE)
+    tag0.track_set_path(custom_track, "Sprite2D:modulate")
+    tag0.track_insert_key(custom_track, 0.0, Color.RED)
+    var hand := Animation.new()
+    mlib.add_animation("hand_made", hand)
+    var tracks_before = tag0.get_track_count()
+    var n2 = AseAnimationImport.reimport(player)
+    var tag0b: Animation = mlib.get_animation("Tag 0")
+    var has_custom = false
+    for ti in tag0b.get_track_count():
+        if String(tag0b.track_get_path(ti)) == "Sprite2D:modulate":
+            has_custom = true
+    var merge_ok = n1 == 3 and n2 == 3 and has_custom \
+        and tag0b.get_track_count() == tracks_before \
+        and mlib.has_animation("hand_made")
+    print("anim_merge: n1=", n1, " n2=", n2, " custom_kept=", has_custom, " tracks=", tag0b.get_track_count(), "/", tracks_before, " ok=", merge_ok)
+    player.free()
+
+    # SpriteFrames assignment helper.
+    var asprite := AnimatedSprite2D.new()
+    var assign_ok = AseAnimationImport.assign_sprite_frames(asprite, "res://sprites/tags3.aseprite", {}) \
+        and asprite.sprite_frames != null and asprite.sprite_frames.get_animation_names().size() == 3 \
+        and asprite.has_meta("aseprite_gd_import")
+    print("sprite_assign: ok=", assign_ok)
+    asprite.free()
+    ok = ok and merge_ok and assign_ok
+
     # Example scenes must instantiate with their imported resources wired up.
     var scene_ok = true
     for scene_path in ["res://examples/animated_character.tscn", "res://examples/ui_panel.tscn", "res://examples/lit_sprite.tscn", "res://examples/animation_player.tscn"]:
