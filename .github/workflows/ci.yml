@@ -1,0 +1,101 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      # default-members exclude the gdext crate on purpose: fast core tests only
+      - run: cargo test
+
+  build-extension:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            lib: libaseprite_gd.so
+          - os: windows-latest
+            lib: aseprite_gd.dll
+          - os: macos-latest
+            lib: libaseprite_gd.dylib
+            targets: aarch64-apple-darwin,x86_64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.targets }}
+      - uses: Swatinem/rust-cache@v2
+      - name: build
+        if: matrix.os != 'macos-latest'
+        run: cargo build -p aseprite-gd --release
+      - name: build universal dylib
+        if: matrix.os == 'macos-latest'
+        run: |
+          cargo build -p aseprite-gd --release --target aarch64-apple-darwin
+          cargo build -p aseprite-gd --release --target x86_64-apple-darwin
+          mkdir -p target/release
+          lipo -create -output target/release/libaseprite_gd.dylib \
+            target/aarch64-apple-darwin/release/libaseprite_gd.dylib \
+            target/x86_64-apple-darwin/release/libaseprite_gd.dylib
+          lipo -info target/release/libaseprite_gd.dylib
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aseprite-gd-${{ matrix.os }}
+          path: target/release/${{ matrix.lib }}
+          if-no-files-found: error
+
+  godot-import:
+    runs-on: ubuntu-latest
+    needs: build-extension
+    timeout-minutes: 15
+    env:
+      GODOT_VERSION: 4.4.1-stable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: aseprite-gd-ubuntu-latest
+          path: target/release
+      # the .gdextension resolves res://../target/{debug,release}; the editor
+      # selects the `linux.debug` entry (editor builds carry the `debug`
+      # feature tag), so provide the library at both paths
+      - name: place extension library
+        run: |
+          mkdir -p target/debug
+          cp target/release/libaseprite_gd.so target/debug/libaseprite_gd.so
+      - name: install godot ${{ env.GODOT_VERSION }}
+        run: |
+          curl -fsSL --retry 3 -o /tmp/godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          unzip -q /tmp/godot.zip -d /tmp
+          sudo install -m 755 "/tmp/Godot_v${GODOT_VERSION}_linux.x86_64" /usr/local/bin/godot
+          godot --version
+      - name: headless import
+        shell: bash
+        run: |
+          godot --headless --path godot --import 2>&1 | tee import.log
+          # a missing/broken extension library does NOT make --import exit
+          # nonzero — catch it explicitly
+          if grep -qE "Can't open dynamic library|GDExtension dynamic library not found" import.log; then
+            echo "::error::GDExtension failed to load during import" >&2
+            exit 1
+          fi
