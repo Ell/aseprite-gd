@@ -40,3 +40,11 @@ ResourceSaver.save(tile_set, "res://world/tiles.tres")
 
 Re-run the sync whenever the art changes; wire it into a save hook or an
 EditorScript shortcut if you want it automatic.
+
+## Mixed tile sizes
+
+`TileSet.tile_size` (the grid cell) is a whole-TileSet property; each synced
+source keeps its own texture region size, so tilesets with different tile
+dimensions coexist — smaller tiles just anchor within the grid cell. The
+fresh-import product sets `tile_size` from the file's first tileset; `sync`
+never touches it on a TileSet you own.

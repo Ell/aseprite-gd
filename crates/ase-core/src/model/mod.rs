@@ -153,14 +153,14 @@ impl BlendMode {
 pub enum LayerType {
     Image,
     Group,
-    /// Carries the index into [`AseFile::tilesets`].
+    /// Carries the index into [`AseFile::tilesets`](crate::AseFile::tilesets).
     Tilemap {
         tileset_index: u32,
     },
 }
 
 /// One layer (§6.2). Layers are stored flat in file order — the index in
-/// [`AseFile::layers`] is exactly the layer index cels reference (gotcha #5).
+/// [`AseFile::layers`](crate::AseFile::layers) is exactly the layer index cels reference (gotcha #5).
 #[derive(Debug, Clone)]
 pub struct Layer {
     pub flags: u16,
@@ -170,7 +170,7 @@ pub struct Layer {
     /// Already normalized: 255 when the header says layer opacity is invalid.
     pub opacity: u8,
     pub name: String,
-    /// Index of the parent group in [`AseFile::layers`], derived from
+    /// Index of the parent group in [`AseFile::layers`](crate::AseFile::layers), derived from
     /// child levels during parsing.
     pub parent: Option<usize>,
     pub uuid: Option<[u8; 16]>,
