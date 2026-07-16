@@ -1,0 +1,85 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            lib: libaseprite_gd.so
+          - os: windows-latest
+            lib: aseprite_gd.dll
+          - os: macos-latest
+            lib: libaseprite_gd.dylib
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: build
+        shell: bash
+        run: |
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            rustup target add aarch64-apple-darwin x86_64-apple-darwin
+            cargo build -p aseprite-gd --release --target aarch64-apple-darwin
+            cargo build -p aseprite-gd --release --target x86_64-apple-darwin
+            mkdir -p target/release
+            lipo -create -output "target/release/${{ matrix.lib }}" \
+              "target/aarch64-apple-darwin/release/${{ matrix.lib }}" \
+              "target/x86_64-apple-darwin/release/${{ matrix.lib }}"
+          else
+            cargo build -p aseprite-gd --release
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lib-${{ runner.os }}
+          path: target/release/${{ matrix.lib }}
+          if-no-files-found: error
+
+  package:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: libs
+          merge-multiple: true
+      - name: assemble addon
+        run: |
+          DEST=dist/addons/aseprite_gd
+          mkdir -p "$DEST/bin"
+          cp godot/addons/aseprite_gd/plugin.cfg godot/addons/aseprite_gd/plugin.gd "$DEST/"
+          cp libs/* "$DEST/bin/"
+          cp LICENSE README.md "$DEST/"
+          # Distribution .gdextension: libraries live inside the addon.
+          cat > "$DEST/aseprite_gd.gdextension" <<'GDEXT'
+          [configuration]
+          entry_symbol = "gdext_rust_init"
+          compatibility_minimum = 4.2
+
+          [libraries]
+          linux.x86_64 = "res://addons/aseprite_gd/bin/libaseprite_gd.so"
+          windows.x86_64 = "res://addons/aseprite_gd/bin/aseprite_gd.dll"
+          macos = "res://addons/aseprite_gd/bin/libaseprite_gd.dylib"
+          GDEXT
+          sed -i 's/^          //' "$DEST/aseprite_gd.gdextension"
+          cd dist && zip -r "../aseprite-gd-${GITHUB_REF_NAME}.zip" addons
+      - name: create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "aseprite-gd-${GITHUB_REF_NAME}.zip" \
+            --title "$GITHUB_REF_NAME" --generate-notes
