@@ -70,6 +70,10 @@ impl IEditorImportPlugin for AseAnimationLibraryImporter {
         sprite_path.set(&"name".to_variant(), &"sprite_path".to_variant());
         sprite_path.set(&"default_value".to_variant(), &"Sprite2D".to_variant());
         opts.push(sprite_path.upcast_any_dictionary());
+        let mut split = VarDictionary::new();
+        split.set(&"name".to_variant(), &"split_layers".to_variant());
+        split.set(&"default_value".to_variant(), &false.to_variant());
+        opts.push(split.upcast_any_dictionary());
         let mut slice_tracks = VarDictionary::new();
         slice_tracks.set(&"name".to_variant(), &"slice_tracks".to_variant());
         slice_tracks.set(&"default_value".to_variant(), &false.to_variant());
@@ -103,13 +107,19 @@ impl IEditorImportPlugin for AseAnimationLibraryImporter {
             .get(&"slice_tracks".to_variant())
             .map(|v| v.booleanize())
             .unwrap_or(false);
-        let library = match convert::build_animation_library(&file, &sprite_path, slice_tracks) {
-            Ok(l) => l,
-            Err(e) => {
-                godot_error!("aseprite-gd: {source_file}: {e}");
-                return Error::ERR_CANT_CREATE;
-            }
-        };
+        let split_layers = options
+            .get(&"split_layers".to_variant())
+            .map(|v| v.booleanize())
+            .unwrap_or(false);
+        let library =
+            match convert::build_animation_library(&file, &sprite_path, slice_tracks, split_layers)
+            {
+                Ok(l) => l,
+                Err(e) => {
+                    godot_error!("aseprite-gd: {source_file}: {e}");
+                    return Error::ERR_CANT_CREATE;
+                }
+            };
 
         let resource = match import::apply_resource_hook(
             library.upcast::<godot::classes::Resource>(),

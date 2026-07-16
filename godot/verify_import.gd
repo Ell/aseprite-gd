@@ -140,6 +140,20 @@ func _init():
         strk_ok = found_pos
         print("slice_tracks: ok=", strk_ok)
 
+    # Split-by-layer: one animation per visible leaf layer, isolated pixels.
+    var split = load("res://sprites/split_layers.aseprite")
+    var split_ok = false
+    if split is SpriteFrames:
+        var names = split.get_animation_names()
+        var solo = split.get_frame_texture("inner_addition/default", 0)
+        var solo_img = solo.get_atlas().get_image().get_region(Rect2i(solo.get_region()))
+        # base layer's opaque right edge must NOT appear in the isolated layer
+        var isolated = solo_img.get_size().x <= 10
+        split_ok = names.size() == 3 and "base/default" in names \
+            and "inner_normal/default" in names and "inner_addition/default" in names \
+            and isolated
+        print("split_layers: anims=", names, " isolated=", isolated, " ok=", split_ok)
+
     # Post-import hooks: resource hook stamps metadata; scene hook builds
     # hitbox nodes from slices before the scene is packed.
     var hook_ok = sf.get_meta("ase_tags", PackedStringArray()).size() == 3
@@ -158,7 +172,7 @@ func _init():
         hroot.free()
 
 
-    var ok = tex is Texture2D and sf is SpriteFrames and sf.get_animation_names().size() == 3 and doc_ok and atlas_ok and lib_ok and tset_ok and sb_ok and custom_ok and rt_ok and ct_ok and slices_ok and sync_ok and strk_ok and hooks_ok
+    var ok = tex is Texture2D and sf is SpriteFrames and sf.get_animation_names().size() == 3 and doc_ok and atlas_ok and lib_ok and tset_ok and sb_ok and custom_ok and rt_ok and ct_ok and slices_ok and sync_ok and strk_ok and hooks_ok and split_ok
     # Example scenes must instantiate with their imported resources wired up.
     var scene_ok = true
     for scene_path in ["res://examples/animated_character.tscn", "res://examples/ui_panel.tscn", "res://examples/lit_sprite.tscn", "res://examples/animation_player.tscn"]:

@@ -65,7 +65,12 @@ impl IEditorImportPlugin for AseSpriteFramesImporter {
     }
 
     fn get_import_options(&self, _path: GString, _preset_index: i32) -> Array<AnyDictionary> {
-        import::common_options()
+        let mut opts = import::common_options();
+        let mut split = VarDictionary::new();
+        split.set(&"name".to_variant(), &"split_layers".to_variant());
+        split.set(&"default_value".to_variant(), &false.to_variant());
+        opts.push(split.upcast_any_dictionary());
+        opts
     }
 
     fn import(
@@ -85,7 +90,15 @@ impl IEditorImportPlugin for AseSpriteFramesImporter {
         };
         let file = ConvertOptions::from_dict(&options).apply(&file);
 
-        let frames = match convert::build_sprite_frames(&file) {
+        let split_layers = options
+            .get(&"split_layers".to_variant())
+            .map(|v| v.booleanize())
+            .unwrap_or(false);
+        let frames = match if split_layers {
+            convert::build_sprite_frames_split(&file)
+        } else {
+            convert::build_sprite_frames(&file)
+        } {
             Ok(f) => f,
             Err(e) => {
                 godot_error!("aseprite-gd: {source_file}: {e}");

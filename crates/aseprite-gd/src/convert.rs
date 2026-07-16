@@ -231,10 +231,24 @@ pub fn build_animation_library(
     file: &AseFile,
     sprite_path: &str,
     slice_tracks: bool,
+    split_layers: bool,
 ) -> Result<Gd<AnimationLibrary>, String> {
     use godot::classes::animation::{LoopMode, TrackType, UpdateMode};
 
-    let textures = frame_atlas_textures(file)?;
+    // Split mode: one texture track per layer, targeting
+    // "<sprite_path>/<layer>:texture" — sprite_path is the container node
+    // holding one sprite child per layer. Playing one animation drives all
+    // layers in sync.
+    let split_units: Vec<(String, Vec<Gd<AtlasTexture>>)> = if split_layers {
+        split_atlas_textures(file)?
+    } else {
+        Vec::new()
+    };
+    let textures = if split_layers {
+        Vec::new()
+    } else {
+        frame_atlas_textures(file)?
+    };
     let mut library = AnimationLibrary::new_gd();
 
     for anim_def in animations(file) {
@@ -251,18 +265,34 @@ pub fn build_animation_library(
             LoopMode::NONE
         });
 
-        let tex_track = anim.add_track(TrackType::VALUE);
-        anim.track_set_path(
-            tex_track,
-            &NodePath::from(format!("{sprite_path}:texture").as_str()),
-        );
-        anim.value_track_set_update_mode(tex_track, UpdateMode::DISCRETE);
+        let mut tex_tracks: Vec<(i32, &Vec<Gd<AtlasTexture>>)> = Vec::new();
+        if split_layers {
+            for (unit, unit_textures) in &split_units {
+                let track = anim.add_track(TrackType::VALUE);
+                anim.track_set_path(
+                    track,
+                    &NodePath::from(format!("{sprite_path}/{unit}:texture").as_str()),
+                );
+                anim.value_track_set_update_mode(track, UpdateMode::DISCRETE);
+                tex_tracks.push((track, unit_textures));
+            }
+        } else {
+            let track = anim.add_track(TrackType::VALUE);
+            anim.track_set_path(
+                track,
+                &NodePath::from(format!("{sprite_path}:texture").as_str()),
+            );
+            anim.value_track_set_update_mode(track, UpdateMode::DISCRETE);
+            tex_tracks.push((track, &textures));
+        }
 
         let mut method_track: Option<i32> = None;
         let mut t_ms: u32 = 0;
         for &frame_index in &anim_def.order {
             let t = t_ms as f64 / 1000.0;
-            anim.track_insert_key(tex_track, t, &textures[frame_index].clone().to_variant());
+            for (track, unit_textures) in &tex_tracks {
+                anim.track_insert_key(*track, t, &unit_textures[frame_index].clone().to_variant());
+            }
 
             // Any cel in this frame with user-data text triggers a method call.
             for cel in &file.frames[frame_index].cels {
@@ -638,6 +668,140 @@ pub fn build_canvas_texture(
         ct.set_specular_texture(&s.upcast::<Texture2D>());
     }
     Ok(ct)
+}
+
+/// Layers imported separately in split mode: leaf (non-group) layers visible
+/// in the tree, in file order. Duplicate names get a numeric suffix so
+/// animation names stay unambiguous.
+pub fn split_units(file: &AseFile) -> Vec<(usize, String)> {
+    use std::collections::HashMap;
+    let mut seen: HashMap<String, usize> = HashMap::new();
+    file.layers
+        .iter()
+        .enumerate()
+        .filter(|(i, l)| {
+            l.layer_type != ase_core::model::LayerType::Group && file.layer_visible_in_tree(*i)
+        })
+        .map(|(i, l)| {
+            let n = seen.entry(l.name.clone()).or_insert(0);
+            *n += 1;
+            let name = if *n == 1 {
+                l.name.clone()
+            } else {
+                format!("{}_{}", l.name, *n)
+            };
+            (i, name)
+        })
+        .collect()
+}
+
+/// A copy of the file where only `target` (and its ancestor groups) render.
+fn isolate_layer(file: &AseFile, target: usize) -> AseFile {
+    let mut f = file.clone();
+    let mut keep = std::collections::HashSet::new();
+    keep.insert(target);
+    let mut cur = f.layers[target].parent;
+    while let Some(p) = cur {
+        keep.insert(p);
+        cur = f.layers[p].parent;
+    }
+    for (i, layer) in f.layers.iter_mut().enumerate() {
+        if keep.contains(&i) {
+            layer.flags |= 1;
+        } else {
+            layer.flags &= !1;
+        }
+    }
+    f
+}
+
+/// One split unit: layer name plus its per-frame canvas-sized textures.
+pub type UnitTextures = (String, Vec<Gd<AtlasTexture>>);
+
+/// Per-unit frame textures for split-layer imports. All units' frames share
+/// one packed atlas (identical/empty renders dedup across units).
+pub fn split_atlas_textures(file: &AseFile) -> Result<Vec<UnitTextures>, String> {
+    let units = split_units(file);
+    if units.is_empty() {
+        return Err("no visible layers to split".to_string());
+    }
+    let frame_count = file.frames.len();
+
+    let mut renders = Vec::with_capacity(units.len() * frame_count);
+    for (idx, _) in &units {
+        let isolated = isolate_layer(file, *idx);
+        for f in 0..frame_count {
+            renders.push(render_frame(&isolated, f).map_err(|e| e.to_string())?);
+        }
+    }
+    let atlas = crate::atlas::pack(&renders, 1, 16384);
+
+    let sheets: Vec<Gd<ImageTexture>> = atlas
+        .pages
+        .iter()
+        .map(|page| {
+            let data = PackedByteArray::from(page.pixels.as_slice());
+            let image = Image::create_from_data(
+                page.width as i32,
+                page.height as i32,
+                false,
+                Format::RGBA8,
+                &data,
+            )
+            .ok_or("atlas Image::create_from_data failed")?;
+            ImageTexture::create_from_image(&image)
+                .ok_or("atlas ImageTexture::create_from_image failed".to_string())
+        })
+        .collect::<Result<_, _>>()?;
+
+    let (cw, ch) = (file.header.width as f32, file.header.height as f32);
+    let mut out = Vec::with_capacity(units.len());
+    for (u, (_, name)) in units.iter().enumerate() {
+        let textures = (0..frame_count)
+            .map(|f| {
+                let p = &atlas.placements[atlas.frame_to_placement[u * frame_count + f]];
+                let mut tex = AtlasTexture::new_gd();
+                tex.set_atlas(&sheets[p.page]);
+                tex.set_region(Rect2::new(
+                    Vector2::new(p.x as f32, p.y as f32),
+                    Vector2::new(p.width as f32, p.height as f32),
+                ));
+                tex.set_margin(Rect2::new(
+                    Vector2::new(p.offset_x as f32, p.offset_y as f32),
+                    Vector2::new(cw - p.width as f32, ch - p.height as f32),
+                ));
+                tex
+            })
+            .collect();
+        out.push((name.clone(), textures));
+    }
+    Ok(out)
+}
+
+/// Split-mode SpriteFrames: one animation per layer per tag, named
+/// "<layer>/<tag>". Stack one AnimatedSprite2D per layer and play the same
+/// tag on each for multi-layer characters.
+pub fn build_sprite_frames_split(file: &AseFile) -> Result<Gd<SpriteFrames>, String> {
+    let mut frames = SpriteFrames::new_gd();
+    frames.remove_animation(&StringName::from("default"));
+    let units = split_atlas_textures(file)?;
+
+    for (unit_name, textures) in &units {
+        for anim in animations(file) {
+            let name = StringName::from(format!("{unit_name}/{}", anim.name).as_str());
+            frames.add_animation(&name);
+            frames.set_animation_speed(&name, 1000.0);
+            frames.set_animation_loop(&name, anim.looped);
+            for &frame_index in &anim.order {
+                let duration = file.frames[frame_index].duration_ms as f32;
+                frames
+                    .add_frame_ex(&name, &textures[frame_index].clone().upcast::<Texture2D>())
+                    .duration(duration)
+                    .done();
+            }
+        }
+    }
+    Ok(frames)
 }
 
 #[cfg(test)]

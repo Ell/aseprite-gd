@@ -29,6 +29,15 @@ nodes named after your slices. Each animation then keys
 `<slice name>:position` and `<slice name>:size` from the slice's per-frame
 keys — draw your hurtboxes in Aseprite, move them per frame, done.
 
+## Multi-layer characters (outfits, equipment)
+
+Enable `split_layers` on the SpriteFrames import: each visible layer becomes
+its own set of animations named `<layer>/<tag>`, all sharing one atlas. Stack
+one AnimatedSprite2D per layer and play the same tag on each. With the
+AnimationLibrary importer instead, `split_layers` puts one texture track per
+layer into each animation (targeting `<sprite_path>/<layer>:texture`), so a
+single AnimationPlayer animation drives every layer in sync.
+
 ## Tilemaps
 
 Quick path: switch the file to *TileSet (Aseprite)* and use the imported
