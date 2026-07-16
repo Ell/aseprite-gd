@@ -34,8 +34,30 @@ impl AseDocument {
         }
     }
 
+    /// Documents not produced by open() are empty rather than a hard error:
+    /// accessors return zero/empty values after logging once per call.
     fn file(&self) -> &ase_core::AseFile {
-        self.inner.as_ref().expect("AseDocument used before open()")
+        use std::sync::OnceLock;
+        static EMPTY: OnceLock<ase_core::AseFile> = OnceLock::new();
+        match self.inner.as_ref() {
+            Some(f) => f,
+            None => {
+                godot_error!("AseDocument used before open()");
+                EMPTY.get_or_init(|| {
+                    // Minimal valid document: 1x1, one empty frame.
+                    let mut h = vec![0u8; 128 + 16];
+                    h[0..4].copy_from_slice(&(144u32).to_le_bytes());
+                    h[4..6].copy_from_slice(&0xA5E0u16.to_le_bytes());
+                    h[6..8].copy_from_slice(&1u16.to_le_bytes());
+                    h[8..10].copy_from_slice(&1u16.to_le_bytes());
+                    h[10..12].copy_from_slice(&1u16.to_le_bytes());
+                    h[12..14].copy_from_slice(&32u16.to_le_bytes());
+                    h[128..132].copy_from_slice(&16u32.to_le_bytes());
+                    h[132..134].copy_from_slice(&0xF1FAu16.to_le_bytes());
+                    ase_core::AseFile::parse(&h).expect("static empty document")
+                })
+            }
+        }
     }
 
     #[func]

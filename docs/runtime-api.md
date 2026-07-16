@@ -16,8 +16,9 @@ Three classes are registered:
 
 A parsed Aseprite document. Extends RefCounted. Construct it with the static
 `open()` method — do not use `AseDocument.new()`; a document that was not
-produced by `open()` holds no file, and calling any accessor on it is a bug
-(it reports the engine error `AseDocument used before open()`).
+produced by `open()` holds no file. Its accessors log the engine error
+`AseDocument used before open()` and return empty values (a 1x1 transparent
+document) instead of crashing.
 
 ### open(path: String) -> AseDocument (static)
 
