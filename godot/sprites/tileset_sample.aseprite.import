@@ -1,0 +1,16 @@
+[remap]
+
+importer="aseprite_gd.tileset"
+type="TileSet"
+uid="uid://2oyu8vvm5c1s"
+path="res://.godot/imported/tileset_sample.aseprite-8e178e7120d3e20d57af3ca05e7cbe1f.res"
+
+[deps]
+
+source_file="res://sprites/tileset_sample.aseprite"
+dest_files=["res://.godot/imported/tileset_sample.aseprite-8e178e7120d3e20d57af3ca05e7cbe1f.res"]
+
+[params]
+
+exclude_layers=""
+include_hidden_layers=false

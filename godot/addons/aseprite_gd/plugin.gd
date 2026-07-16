@@ -9,7 +9,7 @@ var _importers: Array = []
 
 
 func _enter_tree() -> void:
-    for cls in ["AseTextureImporter", "AseSpriteFramesImporter", "AseAnimationLibraryImporter"]:
+    for cls in ["AseTextureImporter", "AseSpriteFramesImporter", "AseAnimationLibraryImporter", "AseTilesetImporter"]:
         if ClassDB.can_instantiate(cls):
             var importer = ClassDB.instantiate(cls)
             add_import_plugin(importer)

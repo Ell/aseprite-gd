@@ -45,6 +45,17 @@ func _init():
         lib_ok = names.size() == 3 and has_tex_track and method_key == "test_user_data_cel"
         print("animlib: anims=", names, " tex_track=", has_tex_track, " method=", method_key, " ok=", lib_ok)
 
-    var ok = tex is Texture2D and sf is SpriteFrames and sf.get_animation_names().size() == 3 and doc_ok and atlas_ok and lib_ok
+    # TileSet import: atlas source with tiles, source id = aseprite tileset id.
+    var tset = load("res://sprites/tileset_sample.aseprite")
+    var tset_ok = false
+    if tset is TileSet:
+        var src_count = tset.get_source_count()
+        if src_count > 0:
+            var src = tset.get_source(tset.get_source_id(0))
+            tset_ok = src is TileSetAtlasSource and src.get_tiles_count() > 0 \
+                and tset.tile_size == Vector2i(2, 2)
+            print("tileset: sources=", src_count, " tiles=", src.get_tiles_count(), " tile_size=", tset.tile_size, " ok=", tset_ok)
+
+    var ok = tex is Texture2D and sf is SpriteFrames and sf.get_animation_names().size() == 3 and doc_ok and atlas_ok and lib_ok and tset_ok
     print("VERIFY: ", "PASS" if ok else "FAIL")
     quit(0 if ok else 1)

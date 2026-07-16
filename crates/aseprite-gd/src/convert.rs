@@ -4,10 +4,13 @@
 use ase_core::AseFile;
 use ase_core::composite::render_frame;
 use ase_core::model::AniDir;
-use godot::builtin::{GString, PackedByteArray, Rect2, StringName, VarDictionary, Vector2};
+use godot::builtin::{
+    GString, PackedByteArray, Rect2, StringName, VarDictionary, Vector2, Vector2i,
+};
 use godot::classes::image::Format;
 use godot::classes::{
     Animation, AnimationLibrary, AtlasTexture, Image, ImageTexture, SpriteFrames, Texture2D,
+    TileSet,
 };
 use godot::prelude::*;
 
@@ -284,4 +287,93 @@ pub fn load_ase(path: &GString) -> Result<AseFile, String> {
         return Err(format!("cannot read {path}"));
     }
     AseFile::parse(bytes.as_slice()).map_err(|e| e.to_string())
+}
+
+/// Builds a Godot TileSet from the file's tilesets: one TileSetAtlasSource
+/// per Aseprite tileset (source id = tileset id), tiles laid out in a
+/// near-square grid. The empty tile (id 0 in release-format files) is not
+/// emitted. Per-tile user-data text lands in an "aseprite_text" custom data
+/// layer. Cell flips need no alternative tiles: Godot cells carry
+/// flip/transpose bits natively.
+pub fn build_tileset(file: &AseFile) -> Result<Gd<TileSet>, String> {
+    use ase_core::composite::tileset_strip_rgba;
+    use godot::classes::{TileSetAtlasSource, TileSetSource};
+
+    let embedded: Vec<_> = file
+        .tilesets
+        .iter()
+        .filter(|t| t.pixels.is_some())
+        .collect();
+    if embedded.is_empty() {
+        return Err("no embedded tilesets in file".to_string());
+    }
+
+    let mut tile_set = TileSet::new_gd();
+    let first = embedded[0];
+    tile_set.set_tile_size(Vector2i::new(
+        first.tile_width as i32,
+        first.tile_height as i32,
+    ));
+
+    let has_text = embedded
+        .iter()
+        .any(|t| t.tile_user_data.iter().any(|u| u.text.is_some()));
+    if has_text {
+        tile_set.add_custom_data_layer();
+        tile_set.set_custom_data_layer_name(0, "aseprite_text");
+        tile_set.set_custom_data_layer_type(0, VariantType::STRING);
+    }
+
+    for ts in embedded {
+        let rgba = tileset_strip_rgba(file, ts).expect("filtered to embedded");
+        let (tw, th) = (ts.tile_width as usize, ts.tile_height as usize);
+        let start = if ts.zero_is_empty() { 1 } else { 0 };
+        let count = (ts.num_tiles as usize).saturating_sub(start);
+        if count == 0 {
+            continue;
+        }
+        let cols = (count as f64).sqrt().ceil() as usize;
+        let rows = count.div_ceil(cols);
+
+        // Re-arrange the vertical strip into a cols x rows sheet.
+        let (sheet_w, sheet_h) = (cols * tw, rows * th);
+        let mut sheet = vec![0u8; sheet_w * sheet_h * 4];
+        for i in 0..count {
+            let src_tile = start + i;
+            let (cx, cy) = (i % cols, i / cols);
+            for row in 0..th {
+                let src = ((src_tile * th + row) * tw) * 4;
+                let dst = ((cy * th + row) * sheet_w + cx * tw) * 4;
+                sheet[dst..dst + tw * 4].copy_from_slice(&rgba[src..src + tw * 4]);
+            }
+        }
+
+        let data = PackedByteArray::from(sheet.as_slice());
+        let image =
+            Image::create_from_data(sheet_w as i32, sheet_h as i32, false, Format::RGBA8, &data)
+                .ok_or("tileset Image::create_from_data failed")?;
+        let texture = ImageTexture::create_from_image(&image)
+            .ok_or("tileset ImageTexture::create_from_image failed")?;
+
+        let mut source = TileSetAtlasSource::new_gd();
+        source.set_texture(&texture);
+        source.set_texture_region_size(Vector2i::new(tw as i32, th as i32));
+        for i in 0..count {
+            let coords = Vector2i::new((i % cols) as i32, (i / cols) as i32);
+            source.create_tile(coords);
+            if has_text
+                && let Some(ud) = ts.tile_user_data.get(start + i)
+                && let Some(text) = &ud.text
+                && let Some(mut td) = source.get_tile_data(coords, 0)
+            {
+                td.set_custom_data("aseprite_text", &text.as_str().to_variant());
+            }
+        }
+        tile_set
+            .add_source_ex(&source.upcast::<TileSetSource>())
+            .atlas_source_id_override(ts.id as i32)
+            .done();
+    }
+
+    Ok(tile_set)
 }

@@ -56,6 +56,30 @@ impl fmt::Display for RenderError {
 
 impl std::error::Error for RenderError {}
 
+/// Converts a tileset's embedded strip to RGBA (§6.13): a vertical column,
+/// tile i at rows `[i*tile_height, (i+1)*tile_height)`. Indexed pixels go
+/// through the first frame's palette. None for external tilesets.
+pub fn tileset_strip_rgba(file: &AseFile, ts: &crate::model::Tileset) -> Option<Vec<u8>> {
+    let strip = ts.pixels.as_ref()?;
+    let palette = file.palette_for(0);
+    let bpp = file.header.color_depth.bytes_per_pixel();
+    Some(
+        strip
+            .chunks_exact(bpp)
+            .flat_map(|px| {
+                pixel_to_rgba(
+                    file.header.color_depth,
+                    palette,
+                    file.header.transparent_index,
+                    false,
+                    px,
+                )
+                .unwrap_or([0, 0, 0, 0])
+            })
+            .collect(),
+    )
+}
+
 /// A flattened frame: straight-alpha RGBA, row-major, canvas-sized.
 pub struct RgbaImage {
     pub width: u32,

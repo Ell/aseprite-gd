@@ -4,4 +4,4 @@
 pub mod blend;
 pub mod render;
 
-pub use render::{RenderError, RgbaImage, render_frame};
+pub use render::{RenderError, RgbaImage, render_frame, tileset_strip_rgba};

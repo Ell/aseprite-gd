@@ -7,6 +7,7 @@
 pub mod animation_library;
 pub mod sprite_frames;
 pub mod texture;
+pub mod tileset;
 
 use godot::builtin::{AnyDictionary, GString, PackedStringArray, VarDictionary, Variant};
 use godot::meta::ToGodot;
