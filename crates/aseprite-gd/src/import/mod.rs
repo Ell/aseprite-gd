@@ -5,6 +5,7 @@
 //! explicitly — engine defaults are unreliable for GDExtension importers.
 
 pub mod animation_library;
+pub mod canvas_texture;
 pub mod sprite_frames;
 pub mod stylebox;
 pub mod texture;

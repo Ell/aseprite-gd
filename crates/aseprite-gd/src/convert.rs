@@ -455,3 +455,71 @@ pub fn build_stylebox(
     }
     Ok(sb)
 }
+
+/// Layer-name convention for lit sprites: layers named (or suffixed)
+/// "normal"/"emission"/"specular" — case-insensitive — are map layers, not
+/// color art.
+fn map_layer_kind(name: &str) -> Option<&'static str> {
+    let n = name.to_ascii_lowercase();
+    for kind in ["normal", "specular", "emission"] {
+        if n == kind || n.ends_with(&format!("_{kind}")) || n.ends_with(&format!(" {kind}")) {
+            return Some(if kind == "emission" { "specular" } else { kind });
+        }
+    }
+    None
+}
+
+/// Renders one frame with only the given predicate's layers visible.
+fn render_filtered(
+    file: &AseFile,
+    frame: usize,
+    keep: impl Fn(&str) -> bool,
+) -> Result<Option<Gd<ImageTexture>>, String> {
+    let mut filtered = file.clone();
+    for layer in &mut filtered.layers {
+        if !keep(&layer.name) {
+            layer.flags &= !1;
+        }
+    }
+    let img = render_frame(&filtered, frame).map_err(|e| e.to_string())?;
+    if img.pixels.chunks_exact(4).all(|px| px[3] == 0) {
+        return Ok(None); // nothing visible
+    }
+    let data = PackedByteArray::from(img.pixels.as_slice());
+    let image = Image::create_from_data(
+        img.width as i32,
+        img.height as i32,
+        false,
+        Format::RGBA8,
+        &data,
+    )
+    .ok_or("Image::create_from_data failed")?;
+    Ok(Some(
+        ImageTexture::create_from_image(&image).ok_or("ImageTexture failed")?,
+    ))
+}
+
+/// Builds a CanvasTexture for lit pixel art: diffuse from ordinary layers,
+/// normal/specular maps from convention-named layers (all sharing the same
+/// canvas-space layout).
+pub fn build_canvas_texture(
+    file: &AseFile,
+    frame: usize,
+) -> Result<Gd<godot::classes::CanvasTexture>, String> {
+    use godot::classes::CanvasTexture;
+
+    let diffuse = render_filtered(file, frame, |n| map_layer_kind(n).is_none())?
+        .ok_or("no visible color layers")?;
+    let normal = render_filtered(file, frame, |n| map_layer_kind(n) == Some("normal"))?;
+    let specular = render_filtered(file, frame, |n| map_layer_kind(n) == Some("specular"))?;
+
+    let mut ct = CanvasTexture::new_gd();
+    ct.set_diffuse_texture(&diffuse.upcast::<Texture2D>());
+    if let Some(n) = normal {
+        ct.set_normal_texture(&n.upcast::<Texture2D>());
+    }
+    if let Some(s) = specular {
+        ct.set_specular_texture(&s.upcast::<Texture2D>());
+    }
+    Ok(ct)
+}

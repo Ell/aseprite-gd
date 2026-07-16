@@ -185,4 +185,25 @@ do
   spr:close()
 end
 
+-- Lit-sprite convention: a color layer plus a "normal" map layer.
+do
+  local spr = Sprite(16, 16, ColorMode.RGB)
+  spr.layers[1].name = "color"
+  spr.cels[1].image:drawImage(base_image(16, 16))
+
+  local nm = spr:newLayer()
+  nm.name = "normal"
+  local img = Image(16, 16, ColorMode.RGB)
+  for y = 0, 15 do
+    for x = 0, 15 do
+      img:putPixel(x, y, app.pixelColor.rgba(128, 128, 255, 255))
+    end
+  end
+  spr:newCel(nm, 1, img, Point(0, 0))
+
+  spr:saveAs(out .. "/lit_sprite.aseprite")
+  spr:saveCopyAs(out .. "/lit_sprite.png")
+  spr:close()
+end
+
 print("corpus written to " .. out)

@@ -1,0 +1,17 @@
+[remap]
+
+importer="aseprite_gd.canvas_texture"
+type="CanvasTexture"
+uid="uid://bc7kay7olcvbl"
+path="res://.godot/imported/lit_sprite.aseprite-397d88b8015b5adc01235b986b1eb3a5.res"
+
+[deps]
+
+source_file="res://sprites/lit_sprite.aseprite"
+dest_files=["res://.godot/imported/lit_sprite.aseprite-397d88b8015b5adc01235b986b1eb3a5.res"]
+
+[params]
+
+exclude_layers=""
+include_hidden_layers=false
+frame=0
