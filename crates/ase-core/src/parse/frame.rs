@@ -1,10 +1,10 @@
 //! Frame header (§4 of docs/ase-format-reference.md).
 
+use crate::Result;
 use crate::error::ParseError;
 use crate::model::FrameHeader;
 use crate::parse::FRAME_MAGIC;
 use crate::read::Reader;
-use crate::Result;
 
 /// Parses a 16-byte frame header, resolving the old/new chunk-count rule:
 /// the old WORD saturates at 0xFFFF, in which case the newer DWORD field holds
@@ -16,7 +16,11 @@ pub fn parse_frame_header(r: &mut Reader) -> Result<FrameHeader> {
     let magic_offset = r.pos();
     let magic = r.u16()?;
     if magic != FRAME_MAGIC {
-        return Err(ParseError::BadMagic { offset: magic_offset, expected: FRAME_MAGIC, found: magic });
+        return Err(ParseError::BadMagic {
+            offset: magic_offset,
+            expected: FRAME_MAGIC,
+            found: magic,
+        });
     }
 
     let old_chunks = r.u16()?;
@@ -31,10 +35,17 @@ pub fn parse_frame_header(r: &mut Reader) -> Result<FrameHeader> {
     };
 
     if (frame_bytes as usize) < r.pos() - frame_start {
-        return Err(ParseError::Invalid { offset: frame_start, what: "frame size (smaller than frame header)" });
+        return Err(ParseError::Invalid {
+            offset: frame_start,
+            what: "frame size (smaller than frame header)",
+        });
     }
 
-    Ok(FrameHeader { frame_bytes, num_chunks, duration_ms })
+    Ok(FrameHeader {
+        frame_bytes,
+        num_chunks,
+        duration_ms,
+    })
 }
 
 #[cfg(test)]

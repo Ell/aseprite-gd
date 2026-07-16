@@ -1,8 +1,8 @@
 //! Tags chunk 0x2018 (§6.9).
 
+use crate::Result;
 use crate::model::{AniDir, Tag};
 use crate::read::Reader;
-use crate::Result;
 
 pub fn parse_tags(r: &mut Reader) -> Result<Vec<Tag>> {
     let n = r.u16()?;
@@ -22,7 +22,15 @@ pub fn parse_tags(r: &mut Reader) -> Result<Vec<Tag>> {
         let color = [r.u8()?, r.u8()?, r.u8()?];
         r.skip(1)?; // extra byte
         let name = r.string()?;
-        tags.push(Tag { from_frame, to_frame, direction, repeat, color, name, user_data: Default::default() });
+        tags.push(Tag {
+            from_frame,
+            to_frame,
+            direction,
+            repeat,
+            color,
+            name,
+            user_data: Default::default(),
+        });
     }
     Ok(tags)
 }

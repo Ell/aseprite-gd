@@ -28,12 +28,15 @@ fn fixture_files() -> Vec<PathBuf> {
 #[test]
 fn all_fixtures_fully_parse() {
     let files = fixture_files();
-    assert!(files.len() >= 60, "expected the full corpus, found {} files", files.len());
+    assert!(
+        files.len() >= 60,
+        "expected the full corpus, found {} files",
+        files.len()
+    );
 
     for path in files {
         let data = std::fs::read(&path).unwrap();
-        let file = AseFile::parse(&data)
-            .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+        let file = AseFile::parse(&data).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
 
         assert_eq!(
             file.frames.len(),
@@ -43,7 +46,11 @@ fn all_fixtures_fully_parse() {
         );
         assert!(!file.layers.is_empty(), "{}: no layers", path.display());
         for frame in &file.frames {
-            assert!(frame.duration_ms > 0, "{}: zero frame duration", path.display());
+            assert!(
+                frame.duration_ms > 0,
+                "{}: zero frame duration",
+                path.display()
+            );
             for cel in &frame.cels {
                 assert!(
                     cel.layer_index < file.layers.len(),

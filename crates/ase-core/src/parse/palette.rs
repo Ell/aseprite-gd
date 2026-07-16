@@ -1,10 +1,10 @@
 //! Palette chunks: new 0x2019 (§6.10) and old 0x0004/0x0011 (§6.1).
 
+use crate::Result;
 use crate::error::ParseError;
 use crate::limits::MAX_PALETTE_ENTRIES;
 use crate::model::Palette;
 use crate::read::Reader;
-use crate::Result;
 
 /// Applies a new palette chunk (0x2019) as a delta onto `pal`.
 pub fn apply_new_palette(r: &mut Reader, pal: &mut Palette) -> Result<()> {
@@ -13,10 +13,16 @@ pub fn apply_new_palette(r: &mut Reader, pal: &mut Palette) -> Result<()> {
     let from = r.u32()?;
     let to = r.u32()?;
     if new_size > MAX_PALETTE_ENTRIES {
-        return Err(ParseError::LimitExceeded { offset: start, what: "palette size" });
+        return Err(ParseError::LimitExceeded {
+            offset: start,
+            what: "palette size",
+        });
     }
     if to < from || to >= new_size {
-        return Err(ParseError::Invalid { offset: start, what: "palette range" });
+        return Err(ParseError::Invalid {
+            offset: start,
+            what: "palette range",
+        });
     }
     r.skip(8)?;
     pal.entries.resize(new_size as usize, [0, 0, 0, 255]);
@@ -44,7 +50,10 @@ pub fn apply_old_palette(r: &mut Reader, pal: &mut Palette, six_bit: bool) -> Re
         };
         let end = index + count;
         if end > MAX_PALETTE_ENTRIES as usize {
-            return Err(ParseError::LimitExceeded { offset: r.pos(), what: "palette size" });
+            return Err(ParseError::LimitExceeded {
+                offset: r.pos(),
+                what: "palette size",
+            });
         }
         if pal.entries.len() < end {
             pal.entries.resize(end, [0, 0, 0, 255]);
@@ -73,10 +82,16 @@ mod tests {
         data.extend_from_slice(&[0u8; 8]);
         data.extend_from_slice(&[0, 0, 10, 20, 30, 40]); // entry 1, no name
         data.extend_from_slice(&[0, 0, 50, 60, 70, 80]); // entry 2
-        let mut pal = Palette { entries: vec![[1, 1, 1, 255]; 3] };
+        let mut pal = Palette {
+            entries: vec![[1, 1, 1, 255]; 3],
+        };
         apply_new_palette(&mut Reader::new(&data), &mut pal).unwrap();
         assert_eq!(pal.entries.len(), 4);
-        assert_eq!(pal.entries[0], [1, 1, 1, 255], "outside delta range untouched");
+        assert_eq!(
+            pal.entries[0],
+            [1, 1, 1, 255],
+            "outside delta range untouched"
+        );
         assert_eq!(pal.entries[1], [10, 20, 30, 40]);
         assert_eq!(pal.entries[2], [50, 60, 70, 80]);
     }

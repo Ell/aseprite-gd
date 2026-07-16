@@ -1,9 +1,9 @@
 //! Slice chunk 0x2022 (§6.12).
 
+use crate::Result;
 use crate::error::ParseError;
 use crate::model::{Slice, SliceKey};
 use crate::read::Reader;
-use crate::Result;
 
 pub fn parse_slice(r: &mut Reader) -> Result<Slice> {
     let start = r.pos();
@@ -14,7 +14,10 @@ pub fn parse_slice(r: &mut Reader) -> Result<Slice> {
 
     // Each key is at least 20 bytes; bound n_keys by what could possibly fit.
     if n_keys as usize > r.remaining() / 20 {
-        return Err(ParseError::Invalid { offset: start, what: "slice key count" });
+        return Err(ParseError::Invalid {
+            offset: start,
+            what: "slice key count",
+        });
     }
 
     let mut keys = Vec::with_capacity(n_keys as usize);
@@ -29,10 +32,26 @@ pub fn parse_slice(r: &mut Reader) -> Result<Slice> {
         } else {
             None
         };
-        let pivot = if flags & 2 != 0 { Some((r.i32()?, r.i32()?)) } else { None };
-        keys.push(SliceKey { frame, x, y, width, height, center, pivot });
+        let pivot = if flags & 2 != 0 {
+            Some((r.i32()?, r.i32()?))
+        } else {
+            None
+        };
+        keys.push(SliceKey {
+            frame,
+            x,
+            y,
+            width,
+            height,
+            center,
+            pivot,
+        });
     }
-    Ok(Slice { name, keys, user_data: Default::default() })
+    Ok(Slice {
+        name,
+        keys,
+        user_data: Default::default(),
+    })
 }
 
 #[cfg(test)]

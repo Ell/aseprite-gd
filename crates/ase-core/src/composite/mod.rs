@@ -4,4 +4,4 @@
 pub mod blend;
 pub mod render;
 
-pub use render::{render_frame, RenderError, RgbaImage};
+pub use render::{RenderError, RgbaImage, render_frame};

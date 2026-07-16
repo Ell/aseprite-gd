@@ -7,7 +7,11 @@ pub enum ParseError {
     /// Ran off the end of the buffer.
     UnexpectedEof { offset: usize, needed: usize },
     /// A magic number didn't match (file header 0xA5E0, frame header 0xF1FA).
-    BadMagic { offset: usize, expected: u16, found: u16 },
+    BadMagic {
+        offset: usize,
+        expected: u16,
+        found: u16,
+    },
     /// A field held a value the spec does not allow.
     Invalid { offset: usize, what: &'static str },
     /// A string field was not valid UTF-8.
@@ -33,10 +37,20 @@ impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ParseError::UnexpectedEof { offset, needed } => {
-                write!(f, "unexpected end of file at offset {offset} (needed {needed} more bytes)")
+                write!(
+                    f,
+                    "unexpected end of file at offset {offset} (needed {needed} more bytes)"
+                )
             }
-            ParseError::BadMagic { offset, expected, found } => {
-                write!(f, "bad magic at offset {offset}: expected 0x{expected:04X}, found 0x{found:04X}")
+            ParseError::BadMagic {
+                offset,
+                expected,
+                found,
+            } => {
+                write!(
+                    f,
+                    "bad magic at offset {offset}: expected 0x{expected:04X}, found 0x{found:04X}"
+                )
             }
             ParseError::Invalid { offset, what } => {
                 write!(f, "invalid {what} at offset {offset}")

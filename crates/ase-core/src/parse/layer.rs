@@ -1,9 +1,9 @@
 //! Layer chunk 0x2004 (§6.2).
 
+use crate::Result;
 use crate::error::ParseError;
 use crate::model::{BlendMode, Layer, LayerType};
 use crate::read::Reader;
-use crate::Result;
 
 pub fn parse_layer(r: &mut Reader, opacity_valid: bool, has_uuid: bool) -> Result<Layer> {
     let flags = r.u16()?;
@@ -12,15 +12,26 @@ pub fn parse_layer(r: &mut Reader, opacity_valid: bool, has_uuid: bool) -> Resul
     let child_level = r.u16()?;
     r.skip(4)?; // default width/height, ignored
     let blend_mode = BlendMode::from_u16(r.u16()?);
-    let opacity = if opacity_valid { r.u8()? } else { r.skip(1).map(|_| 255)? };
+    let opacity = if opacity_valid {
+        r.u8()?
+    } else {
+        r.skip(1).map(|_| 255)?
+    };
     r.skip(3)?; // reserved
     let name = r.string()?;
 
     let layer_type = match raw_type {
         0 => LayerType::Image,
         1 => LayerType::Group,
-        2 => LayerType::Tilemap { tileset_index: r.u32()? },
-        _ => return Err(ParseError::Invalid { offset: type_offset, what: "layer type" }),
+        2 => LayerType::Tilemap {
+            tileset_index: r.u32()?,
+        },
+        _ => {
+            return Err(ParseError::Invalid {
+                offset: type_offset,
+                what: "layer type",
+            });
+        }
     };
 
     let uuid = if has_uuid {
@@ -59,7 +70,14 @@ pub fn resolve_parent(layers: &[Layer], child_level: u16) -> Option<usize> {
 mod tests {
     use super::*;
 
-    fn layer_bytes(flags: u16, ty: u16, level: u16, blend: u16, opacity: u8, name: &str) -> Vec<u8> {
+    fn layer_bytes(
+        flags: u16,
+        ty: u16,
+        level: u16,
+        blend: u16,
+        opacity: u8,
+        name: &str,
+    ) -> Vec<u8> {
         let mut b = vec![];
         b.extend_from_slice(&flags.to_le_bytes());
         b.extend_from_slice(&ty.to_le_bytes());
@@ -88,7 +106,10 @@ mod tests {
     fn opacity_forced_when_header_flag_clear() {
         let bytes = layer_bytes(1, 0, 0, 0, 42, "x");
         let l = parse_layer(&mut Reader::new(&bytes), false, false).unwrap();
-        assert_eq!(l.opacity, 255, "gotcha #4: opacity invalid without header flag");
+        assert_eq!(
+            l.opacity, 255,
+            "gotcha #4: opacity invalid without header flag"
+        );
     }
 
     #[test]
@@ -112,6 +133,9 @@ mod tests {
             l.parent = *parents.last().unwrap();
             layers.push(l);
         }
-        assert_eq!(parents, vec![None, Some(0), None, Some(2), Some(3), Some(2)]);
+        assert_eq!(
+            parents,
+            vec![None, Some(0), None, Some(2), Some(3), Some(2)]
+        );
     }
 }

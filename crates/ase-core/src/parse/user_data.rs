@@ -1,15 +1,19 @@
 //! User data chunk 0x2020 (§6.11): text, color, and the v1.3 typed
 //! properties maps. Association to objects happens in `file.rs` (gotcha #17).
 
+use crate::Result;
 use crate::error::ParseError;
 use crate::limits::MAX_PROPERTY_DEPTH;
 use crate::model::{Properties, PropertiesMap, PropertyValue, UserData};
 use crate::read::Reader;
-use crate::Result;
 
 pub fn parse_user_data(r: &mut Reader) -> Result<UserData> {
     let flags = r.u32()?;
-    let text = if flags & 1 != 0 { Some(r.string()?) } else { None };
+    let text = if flags & 1 != 0 {
+        Some(r.string()?)
+    } else {
+        None
+    };
     let color = if flags & 2 != 0 {
         Some([r.u8()?, r.u8()?, r.u8()?, r.u8()?])
     } else {
@@ -21,7 +25,10 @@ pub fn parse_user_data(r: &mut Reader) -> Result<UserData> {
         let props_start = r.pos();
         let total = r.u32()? as usize;
         if total < 8 {
-            return Err(ParseError::Invalid { offset: props_start, what: "properties size" });
+            return Err(ParseError::Invalid {
+                offset: props_start,
+                what: "properties size",
+            });
         }
         let end = props_start + total;
         // The blob size is stored precisely so readers can survive unknown
@@ -39,7 +46,10 @@ fn parse_maps(r: &mut Reader, end: usize) -> Result<Vec<PropertiesMap>> {
     let mut maps = Vec::new();
     for _ in 0..n_maps {
         if r.pos() >= end {
-            return Err(ParseError::Invalid { offset: r.pos(), what: "properties map count" });
+            return Err(ParseError::Invalid {
+                offset: r.pos(),
+                what: "properties map count",
+            });
         }
         let key = r.u32()?;
         let properties = parse_properties(r, 0)?;
@@ -50,12 +60,18 @@ fn parse_maps(r: &mut Reader, end: usize) -> Result<Vec<PropertiesMap>> {
 
 fn parse_properties(r: &mut Reader, depth: u32) -> Result<Properties> {
     if depth > MAX_PROPERTY_DEPTH {
-        return Err(ParseError::LimitExceeded { offset: r.pos(), what: "property nesting" });
+        return Err(ParseError::LimitExceeded {
+            offset: r.pos(),
+            what: "property nesting",
+        });
     }
     let n = r.u32()?;
     // Each property is at least name(2) + type(2) + 1 byte of value.
     if n as usize > r.remaining() / 5 {
-        return Err(ParseError::Invalid { offset: r.pos(), what: "property count" });
+        return Err(ParseError::Invalid {
+            offset: r.pos(),
+            what: "property count",
+        });
     }
     let mut props = Vec::with_capacity(n as usize);
     for _ in 0..n {
@@ -89,12 +105,19 @@ fn parse_value(r: &mut Reader, ty: u16, depth: u32) -> Result<PropertyValue> {
             let n = r.u32()?;
             let elems_type = r.u16()?;
             if n as usize > r.remaining() {
-                return Err(ParseError::Invalid { offset: r.pos(), what: "vector length" });
+                return Err(ParseError::Invalid {
+                    offset: r.pos(),
+                    what: "vector length",
+                });
             }
             let mut v = Vec::with_capacity(n as usize);
             for _ in 0..n {
                 // elemsType 0 = heterogeneous: each element carries its type.
-                let ty = if elems_type == 0 { r.u16()? } else { elems_type };
+                let ty = if elems_type == 0 {
+                    r.u16()?
+                } else {
+                    elems_type
+                };
                 v.push(parse_value(r, ty, depth + 1)?);
             }
             Vector(v)
@@ -107,7 +130,12 @@ fn parse_value(r: &mut Reader, ty: u16, depth: u32) -> Result<PropertyValue> {
         }
         // 0x0000 (nullptr) must not appear in files; anything else is a
         // future type we can't skip (unknown width) — abort the blob (§6.11).
-        _ => return Err(ParseError::Invalid { offset: r.pos(), what: "property type" }),
+        _ => {
+            return Err(ParseError::Invalid {
+                offset: r.pos(),
+                what: "property type",
+            });
+        }
     })
 }
 
@@ -164,11 +192,17 @@ mod tests {
         assert_eq!(props[0], ("n".into(), PropertyValue::I32(7)));
         assert_eq!(
             props[1],
-            ("v".into(), PropertyValue::Vector(vec![PropertyValue::U8(1), PropertyValue::U8(2)]))
+            (
+                "v".into(),
+                PropertyValue::Vector(vec![PropertyValue::U8(1), PropertyValue::U8(2)])
+            )
         );
         assert_eq!(
             props[2],
-            ("m".into(), PropertyValue::Map(vec![("s".into(), PropertyValue::Str("x".into()))]))
+            (
+                "m".into(),
+                PropertyValue::Map(vec![("s".into(), PropertyValue::Str("x".into()))])
+            )
         );
     }
 
