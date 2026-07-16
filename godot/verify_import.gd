@@ -140,7 +140,25 @@ func _init():
         strk_ok = found_pos
         print("slice_tracks: ok=", strk_ok)
 
-    var ok = tex is Texture2D and sf is SpriteFrames and sf.get_animation_names().size() == 3 and doc_ok and atlas_ok and lib_ok and tset_ok and sb_ok and custom_ok and rt_ok and ct_ok and slices_ok and sync_ok and strk_ok
+    # Post-import hooks: resource hook stamps metadata; scene hook builds
+    # hitbox nodes from slices before the scene is packed.
+    var hook_ok = sf.get_meta("ase_tags", PackedStringArray()).size() == 3
+    var hscene = load("res://sprites/slices_scene.aseprite")
+    var hooks_ok = false
+    if hscene is PackedScene:
+        var hroot = hscene.instantiate()
+        var hit = hroot.get_node_or_null("Hitboxes")
+        var panel_shape = hit.get_node_or_null("panel") if hit else null
+        hooks_ok = hook_ok and hit is Area2D and panel_shape is CollisionShape2D \
+            and panel_shape.shape.size == Vector2(24, 16) \
+            and panel_shape.position == Vector2(4 + 12, 4 + 8) \
+            and hroot.get_node_or_null("AnimatedSprite2D") != null \
+            and panel_shape.get_meta("ase_text", "") == "nine"
+        print("post_import_hooks: resource_meta=", hook_ok, " scene=", hooks_ok)
+        hroot.free()
+
+
+    var ok = tex is Texture2D and sf is SpriteFrames and sf.get_animation_names().size() == 3 and doc_ok and atlas_ok and lib_ok and tset_ok and sb_ok and custom_ok and rt_ok and ct_ok and slices_ok and sync_ok and strk_ok and hooks_ok
     # Example scenes must instantiate with their imported resources wired up.
     var scene_ok = true
     for scene_path in ["res://examples/animated_character.tscn", "res://examples/ui_panel.tscn", "res://examples/lit_sprite.tscn", "res://examples/animation_player.tscn"]:

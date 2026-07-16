@@ -36,6 +36,13 @@ impl AseDocument {
 
     /// Documents not produced by open() are empty rather than a hard error:
     /// accessors return zero/empty values after logging once per call.
+    /// Wraps an already-parsed file (used by post-import hooks).
+    pub(crate) fn from_file(file: ase_core::AseFile) -> Gd<AseDocument> {
+        let mut doc = AseDocument::new_gd();
+        doc.bind_mut().inner = Some(file);
+        doc
+    }
+
     fn file(&self) -> &ase_core::AseFile {
         use std::sync::OnceLock;
         static EMPTY: OnceLock<ase_core::AseFile> = OnceLock::new();

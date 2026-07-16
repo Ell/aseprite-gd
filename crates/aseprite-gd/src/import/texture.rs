@@ -102,9 +102,21 @@ impl IEditorImportPlugin for AseTextureImporter {
             }
         };
 
+        let resource = match import::apply_resource_hook(
+            texture.upcast::<godot::classes::Resource>(),
+            &file,
+            &options,
+            &source_file,
+        ) {
+            Ok(r) => r,
+            Err(e) => {
+                godot_error!("aseprite-gd: {source_file}: {e}");
+                return Error::ERR_CANT_CREATE;
+            }
+        };
         let out = format!("{save_path}.res");
         ResourceSaver::singleton()
-            .save_ex(&texture)
+            .save_ex(&resource)
             .path(&GString::from(out.as_str()))
             .done()
     }

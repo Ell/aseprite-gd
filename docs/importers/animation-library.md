@@ -30,6 +30,7 @@ func _ready() -> void:
 |---|---|---|
 | `exclude_layers` | `""` | Comma-separated, case-sensitive substrings; layers whose names contain any of them are hidden, including layers revealed by `include_hidden_layers`. Empty disables the filter. |
 | `include_hidden_layers` | `false` | Also render layers that are hidden in Aseprite. |
+| `post_import_script` | `""` | Path to a hook script whose `_post_import` runs on the built resource before it is saved — see [post-import-hooks.md](../post-import-hooks.md). |
 | `sprite_path` | `"Sprite2D"` | Node path (relative to the AnimationPlayer's root node) that the texture and method tracks target. An empty value falls back to `Sprite2D`. |
 | `slice_tracks` | `false` | Also emit `<slice name>:position` and `<slice name>:size` value tracks from per-frame slice keys. |
 

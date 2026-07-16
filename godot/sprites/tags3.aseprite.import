@@ -14,3 +14,4 @@ dest_files=["res://.godot/imported/tags3.aseprite-3c8174fefc4fdb853ac8e98ab83112
 
 exclude_layers=""
 include_hidden_layers=false
+post_import_script="res://hooks/tag_metadata.gd"

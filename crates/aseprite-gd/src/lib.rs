@@ -6,6 +6,7 @@ use godot::prelude::*;
 
 pub mod atlas;
 pub mod convert;
+pub mod hooks;
 pub mod import;
 pub mod runtime;
 

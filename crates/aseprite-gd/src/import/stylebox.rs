@@ -110,9 +110,21 @@ impl IEditorImportPlugin for AseStyleBoxImporter {
             }
         };
 
+        let resource = match import::apply_resource_hook(
+            library.upcast::<godot::classes::Resource>(),
+            &file,
+            &options,
+            &source_file,
+        ) {
+            Ok(r) => r,
+            Err(e) => {
+                godot_error!("aseprite-gd: {source_file}: {e}");
+                return Error::ERR_CANT_CREATE;
+            }
+        };
         let out = format!("{save_path}.res");
         ResourceSaver::singleton()
-            .save_ex(&library)
+            .save_ex(&resource)
             .path(&GString::from(out.as_str()))
             .done()
     }
