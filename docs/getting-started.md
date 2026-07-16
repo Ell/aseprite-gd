@@ -63,6 +63,7 @@ example scenes are in the repository's demo project under `godot/examples/`.
 |---|---|---|
 | `exclude_layers` | `""` | Comma-separated, case-sensitive substrings; layers whose names contain any of them are hidden for this import |
 | `include_hidden_layers` | `false` | Render layers that are hidden in Aseprite too |
+| `exclude_tags` | `""` | Comma-separated substrings; matching tags produce no animations |
 | `post_import_script` | `""` | Hook script run on the built product before saving — see [post-import-hooks.md](post-import-hooks.md) |
 
 ## Scripting and runtime loading

@@ -83,7 +83,12 @@ impl IEditorImportPlugin for AseSceneImporter {
     }
 
     fn get_import_options(&self, _path: GString, _preset_index: i32) -> Array<AnyDictionary> {
-        import::common_options()
+        let mut opts = import::common_options();
+        let mut autoplay = VarDictionary::new();
+        autoplay.set(&"name".to_variant(), &"autoplay".to_variant());
+        autoplay.set(&"default_value".to_variant(), &true.to_variant());
+        opts.push(autoplay.upcast_any_dictionary());
+        opts
     }
 
     fn import(
@@ -127,8 +132,14 @@ impl IEditorImportPlugin for AseSceneImporter {
         let mut sprite = AnimatedSprite2D::new_alloc();
         sprite.set_name("AnimatedSprite2D");
         sprite.set_sprite_frames(&frames);
+        let autoplay = options
+            .get(&"autoplay".to_variant())
+            .map(|v| v.booleanize())
+            .unwrap_or(true);
         if let Some(anim) = convert::animations(&file).first() {
-            sprite.set_autoplay(&GString::from(anim.name.as_str()));
+            if autoplay {
+                sprite.set_autoplay(&GString::from(anim.name.as_str()));
+            }
             sprite.set_animation(&StringName::from(anim.name.as_str()));
         }
         root.add_child(&sprite);

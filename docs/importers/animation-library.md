@@ -30,6 +30,7 @@ func _ready() -> void:
 |---|---|---|
 | `exclude_layers` | `""` | Comma-separated, case-sensitive substrings; layers whose names contain any of them are hidden, including layers revealed by `include_hidden_layers`. Empty disables the filter. |
 | `include_hidden_layers` | `false` | Also render layers that are hidden in Aseprite. |
+| `exclude_tags` | `""` | Comma-separated, case-sensitive substrings; tags whose names contain any of them produce no animations. |
 | `post_import_script` | `""` | Path to a hook script whose `_post_import` runs on the built resource before it is saved — see [post-import-hooks.md](../post-import-hooks.md). |
 | `split_layers` | `false` | Each animation gains one texture track per visible leaf layer, targeting `<sprite_path>/<layer>:texture` — `sprite_path` becomes the container holding one sprite child per layer. One animation drives every layer in sync. |
 | `sprite_path` | `"Sprite2D"` | Node path (relative to the AnimationPlayer's root node) that the texture and method tracks target. An empty value falls back to `Sprite2D`. |
@@ -97,3 +98,6 @@ rect stays in effect.
 - Slice track paths are the slice name verbatim; slice names that are not
   valid node names (or nodes that do not exist) leave those tracks inert.
 - Indexed and grayscale files are handled transparently.
+
+`create_reset_animation` adds a RESET animation keying frame 0 on every
+texture track, defining the neutral pose for the editor and AnimationMixer.

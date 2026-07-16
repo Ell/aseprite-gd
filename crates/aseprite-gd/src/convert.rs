@@ -19,6 +19,9 @@ pub struct ConvertOptions {
     /// Comma-separated, case-sensitive substrings; layers whose names contain
     /// any of them are hidden.
     pub exclude_layers: String,
+    /// Comma-separated, case-sensitive substrings; tags whose names contain
+    /// any of them produce no animations.
+    pub exclude_tags: String,
     /// Render layers that are hidden in Aseprite too.
     pub include_hidden_layers: bool,
 }
@@ -28,6 +31,10 @@ impl ConvertOptions {
         ConvertOptions {
             exclude_layers: options
                 .get(&"exclude_layers".to_variant())
+                .map(|v| v.to_string())
+                .unwrap_or_default(),
+            exclude_tags: options
+                .get(&"exclude_tags".to_variant())
                 .map(|v| v.to_string())
                 .unwrap_or_default(),
             include_hidden_layers: options
@@ -54,6 +61,14 @@ impl ConvertOptions {
                 layer.flags &= !1;
             }
         }
+        file.tags.retain(|t| {
+            !self
+                .exclude_tags
+                .split(',')
+                .map(str::trim)
+                .filter(|p| !p.is_empty())
+                .any(|p| t.name.contains(p))
+        });
         file
     }
 }
@@ -232,6 +247,7 @@ pub fn build_animation_library(
     sprite_path: &str,
     slice_tracks: bool,
     split_layers: bool,
+    create_reset: bool,
 ) -> Result<Gd<AnimationLibrary>, String> {
     use godot::classes::animation::{LoopMode, TrackType, UpdateMode};
 
@@ -364,6 +380,34 @@ pub fn build_animation_library(
         }
 
         library.add_animation(&StringName::from(anim_def.name.as_str()), &anim);
+    }
+
+    // RESET: a one-key animation restoring frame 0, used by the editor and
+    // AnimationMixer to define the neutral pose.
+    if create_reset {
+        use godot::classes::animation::{TrackType, UpdateMode};
+        let mut reset = Animation::new_gd();
+        reset.set_length(0.001);
+        let units: Vec<(String, Gd<AtlasTexture>)> = if split_layers {
+            split_atlas_textures(file)?
+                .into_iter()
+                .map(|(n, mut t)| (n, t.remove(0)))
+                .collect()
+        } else {
+            vec![("".to_string(), frame_atlas_textures(file)?.remove(0))]
+        };
+        for (unit, texture) in units {
+            let track = reset.add_track(TrackType::VALUE);
+            let path = if unit.is_empty() {
+                format!("{sprite_path}:texture")
+            } else {
+                format!("{sprite_path}/{unit}:texture")
+            };
+            reset.track_set_path(track, &NodePath::from(path.as_str()));
+            reset.value_track_set_update_mode(track, UpdateMode::DISCRETE);
+            reset.track_insert_key(track, 0.0, &texture.to_variant());
+        }
+        library.add_animation(&StringName::from("RESET"), &reset);
     }
 
     Ok(library)
@@ -534,6 +578,53 @@ pub fn build_tileset(file: &AseFile) -> Result<Gd<TileSet>, String> {
     Ok(tile_set)
 }
 
+/// Renders `frame` and crops it to a slice key's rect (clamped to canvas).
+fn slice_texture(
+    file: &AseFile,
+    frame: usize,
+    key: &ase_core::model::SliceKey,
+) -> Result<Gd<ImageTexture>, String> {
+    let rendered = render_frame(file, frame).map_err(|e| e.to_string())?;
+    let (cw, ch) = (rendered.width as i64, rendered.height as i64);
+    let x0 = (key.x as i64).clamp(0, cw);
+    let y0 = (key.y as i64).clamp(0, ch);
+    let x1 = (key.x as i64 + key.width as i64).clamp(0, cw);
+    let y1 = (key.y as i64 + key.height as i64).clamp(0, ch);
+    let (w, h) = ((x1 - x0) as usize, (y1 - y0) as usize);
+    if w == 0 || h == 0 {
+        return Err("slice lies outside the canvas".to_string());
+    }
+    let mut pixels = Vec::with_capacity(w * h * 4);
+    for y in y0..y1 {
+        let row = ((y * cw + x0) * 4) as usize;
+        pixels.extend_from_slice(&rendered.pixels[row..row + w * 4]);
+    }
+    let data = PackedByteArray::from(pixels.as_slice());
+    let image = Image::create_from_data(w as i32, h as i32, false, Format::RGBA8, &data)
+        .ok_or("slice Image::create_from_data failed")?;
+    ImageTexture::create_from_image(&image).ok_or("slice ImageTexture failed".to_string())
+}
+
+/// A frame texture cropped to a named slice.
+pub fn texture_for_frame_slice(
+    file: &AseFile,
+    frame: usize,
+    slice_name: &str,
+) -> Result<Gd<ImageTexture>, String> {
+    let slice = file
+        .slices
+        .iter()
+        .find(|s| s.name == slice_name)
+        .ok_or_else(|| format!("no slice named {slice_name:?}"))?;
+    let key = slice
+        .key_for(frame as u32)
+        .ok_or("slice has no key at this frame")?;
+    if key.width == 0 || key.height == 0 {
+        return Err("slice is hidden at this frame".to_string());
+    }
+    slice_texture(file, frame, key)
+}
+
 /// Builds a StyleBoxTexture from a 9-patch slice (§6.12): the slice rect is
 /// cropped out of the rendered frame, and the center rect becomes the four
 /// texture margins. `slice_name` empty = first slice with a center.
@@ -563,26 +654,7 @@ pub fn build_stylebox(
         return Err("slice is hidden at this frame".to_string());
     }
 
-    // Crop the slice rect out of the rendered frame, clamped to the canvas.
-    let rendered = render_frame(file, frame).map_err(|e| e.to_string())?;
-    let (cw, ch) = (rendered.width as i64, rendered.height as i64);
-    let x0 = (key.x as i64).clamp(0, cw);
-    let y0 = (key.y as i64).clamp(0, ch);
-    let x1 = (key.x as i64 + key.width as i64).clamp(0, cw);
-    let y1 = (key.y as i64 + key.height as i64).clamp(0, ch);
-    let (w, h) = ((x1 - x0) as usize, (y1 - y0) as usize);
-    if w == 0 || h == 0 {
-        return Err("slice lies outside the canvas".to_string());
-    }
-    let mut pixels = Vec::with_capacity(w * h * 4);
-    for y in y0..y1 {
-        let row = ((y * cw + x0) * 4) as usize;
-        pixels.extend_from_slice(&rendered.pixels[row..row + w * 4]);
-    }
-    let data = PackedByteArray::from(pixels.as_slice());
-    let image = Image::create_from_data(w as i32, h as i32, false, Format::RGBA8, &data)
-        .ok_or("slice Image::create_from_data failed")?;
-    let texture = ImageTexture::create_from_image(&image).ok_or("slice ImageTexture failed")?;
+    let texture = slice_texture(file, frame, key)?;
 
     let mut sb = StyleBoxTexture::new_gd();
     sb.set_texture(&texture.upcast::<Texture2D>());
@@ -821,6 +893,7 @@ mod tests {
         let file = fixture(); // layers: base, fx (group), inner_normal, inner_addition
         let opts = ConvertOptions {
             exclude_layers: "inner_normal, inner_addition".to_string(),
+            exclude_tags: String::new(),
             include_hidden_layers: false,
         };
         let out = opts.apply(&file);
@@ -842,12 +915,14 @@ mod tests {
         // Single pattern still works; empty string excludes nothing.
         let one = ConvertOptions {
             exclude_layers: "addition".into(),
+            exclude_tags: String::new(),
             include_hidden_layers: false,
         }
         .apply(&file);
         assert!(one.layers[2].is_visible() && !one.layers[3].is_visible());
         let none = ConvertOptions {
             exclude_layers: "".into(),
+            exclude_tags: String::new(),
             include_hidden_layers: false,
         }
         .apply(&file);

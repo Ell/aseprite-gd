@@ -13,7 +13,10 @@ dest_files=["res://.godot/imported/user_data.aseprite-a864b46061a5253375fb33b56f
 [params]
 
 exclude_layers=""
+exclude_tags=""
 include_hidden_layers=false
 post_import_script=""
 sprite_path="Sprite2D"
+create_reset_animation=true
+split_layers=false
 slice_tracks=false

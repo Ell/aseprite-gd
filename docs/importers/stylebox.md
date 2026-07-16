@@ -20,6 +20,7 @@ theme.
 |---|---|---|
 | `exclude_layers` | `""` | Comma-separated, case-sensitive substrings; layers whose names contain any of them are hidden, including layers revealed by `include_hidden_layers`. Empty disables the filter. |
 | `include_hidden_layers` | `false` | Also render layers that are hidden in Aseprite. |
+| `exclude_tags` | `""` | Comma-separated, case-sensitive substrings; tags whose names contain any of them produce no animations. |
 | `post_import_script` | `""` | Path to a hook script whose `_post_import` runs on the built resource before it is saved — see [post-import-hooks.md](../post-import-hooks.md). |
 | `slice_name` | `""` | Which slice to import, by exact name. Empty selects the first slice that has a 9-slices center. |
 | `frame` | `0` | Which frame to render and take the slice key from. Values past the last frame clamp to the last frame. |

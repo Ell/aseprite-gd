@@ -34,7 +34,7 @@ func _init():
     var lib_ok = false
     if lib is AnimationLibrary:
         var names = lib.get_animation_list()
-        var a = lib.get_animation(names[0])
+        var a = lib.get_animation("Tag 0")
         var has_tex_track = false
         var method_key = ""
         for ti in a.get_track_count():
@@ -42,7 +42,7 @@ func _init():
                 has_tex_track = a.track_get_key_count(ti) > 0
             if a.track_get_type(ti) == Animation.TYPE_METHOD and a.track_get_key_count(ti) > 0:
                 method_key = a.method_track_get_name(ti, 0)
-        lib_ok = names.size() == 3 and has_tex_track and method_key == "test_user_data_cel"
+        lib_ok = names.size() == 4 and has_tex_track and method_key == "test_user_data_cel"
         print("animlib: anims=", names, " tex_track=", has_tex_track, " method=", method_key, " ok=", lib_ok)
 
     # TileSet import: atlas source with tiles, source id = aseprite tileset id.
@@ -140,6 +140,15 @@ func _init():
         strk_ok = found_pos
         print("slice_tracks: ok=", strk_ok)
 
+    # RESET animation + slice-cropped texture options.
+    var lib2 = load("res://sprites/user_data.aseprite")
+    var reset_ok = lib2 is AnimationLibrary and lib2.has_animation("RESET") \
+        and lib2.get_animation("RESET").get_track_count() == 1
+    var stex = load("res://sprites/slices_tex.aseprite")
+    var stex_ok = stex is Texture2D and stex.get_size() == Vector2(24, 16)
+    var opts_ok = reset_ok and stex_ok
+    print("option_features: reset=", reset_ok, " slice_tex=", stex_ok)
+
     # Split-by-layer: one animation per visible leaf layer, isolated pixels.
     var split = load("res://sprites/split_layers.aseprite")
     var split_ok = false
@@ -172,7 +181,7 @@ func _init():
         hroot.free()
 
 
-    var ok = tex is Texture2D and sf is SpriteFrames and sf.get_animation_names().size() == 3 and doc_ok and atlas_ok and lib_ok and tset_ok and sb_ok and custom_ok and rt_ok and ct_ok and slices_ok and sync_ok and strk_ok and hooks_ok and split_ok
+    var ok = tex is Texture2D and sf is SpriteFrames and sf.get_animation_names().size() == 3 and doc_ok and atlas_ok and lib_ok and tset_ok and sb_ok and custom_ok and rt_ok and ct_ok and slices_ok and sync_ok and strk_ok and hooks_ok and split_ok and opts_ok
     # Example scenes must instantiate with their imported resources wired up.
     var scene_ok = true
     for scene_path in ["res://examples/animated_character.tscn", "res://examples/ui_panel.tscn", "res://examples/lit_sprite.tscn", "res://examples/animation_player.tscn"]:

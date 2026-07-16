@@ -69,6 +69,10 @@ impl IEditorImportPlugin for AseTextureImporter {
         frame.set(&"name".to_variant(), &"frame".to_variant());
         frame.set(&"default_value".to_variant(), &0.to_variant());
         opts.push(frame.upcast_any_dictionary());
+        let mut slice = VarDictionary::new();
+        slice.set(&"name".to_variant(), &"slice".to_variant());
+        slice.set(&"default_value".to_variant(), &"".to_variant());
+        opts.push(slice.upcast_any_dictionary());
         opts
     }
 
@@ -94,7 +98,15 @@ impl IEditorImportPlugin for AseTextureImporter {
             .unwrap_or(0)
             .min(file.frames.len().saturating_sub(1));
 
-        let texture = match convert::texture_for_frame(&file, frame) {
+        let slice = options
+            .get(&"slice".to_variant())
+            .map(|v| v.to_string())
+            .unwrap_or_default();
+        let texture = match if slice.trim().is_empty() {
+            convert::texture_for_frame(&file, frame)
+        } else {
+            convert::texture_for_frame_slice(&file, frame, slice.trim())
+        } {
             Ok(t) => t,
             Err(e) => {
                 godot_error!("aseprite-gd: {source_file}: {e}");

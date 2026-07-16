@@ -31,6 +31,7 @@ fn option(name: &str, default: Variant) -> AnyDictionary {
 pub fn common_options() -> Array<AnyDictionary> {
     let mut a = Array::new();
     a.push(option("exclude_layers", "".to_variant()));
+    a.push(option("exclude_tags", "".to_variant()));
     a.push(option("include_hidden_layers", false.to_variant()));
     a.push(script_option());
     a
