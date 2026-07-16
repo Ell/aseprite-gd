@@ -13,6 +13,7 @@ dest_files=["res://.godot/imported/lit_sprite.aseprite-397d88b8015b5adc01235b986
 [params]
 
 exclude_layers=""
+exclude_tags=""
 include_hidden_layers=false
 post_import_script=""
 frame=0

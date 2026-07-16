@@ -13,6 +13,9 @@ dest_files=["res://.godot/imported/split_layers.aseprite-917aba825b9b586b54bc0a3
 [params]
 
 exclude_layers=""
+exclude_tags=""
 include_hidden_layers=false
 post_import_script=""
 split_layers=true
+atlas_padding=1
+atlas_extrude=false

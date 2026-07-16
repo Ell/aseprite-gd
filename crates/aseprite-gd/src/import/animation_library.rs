@@ -82,6 +82,14 @@ impl IEditorImportPlugin for AseAnimationLibraryImporter {
         slice_tracks.set(&"name".to_variant(), &"slice_tracks".to_variant());
         slice_tracks.set(&"default_value".to_variant(), &false.to_variant());
         opts.push(slice_tracks.upcast_any_dictionary());
+        let mut pad = VarDictionary::new();
+        pad.set(&"name".to_variant(), &"atlas_padding".to_variant());
+        pad.set(&"default_value".to_variant(), &1.to_variant());
+        opts.push(pad.upcast_any_dictionary());
+        let mut extrude = VarDictionary::new();
+        extrude.set(&"name".to_variant(), &"atlas_extrude".to_variant());
+        extrude.set(&"default_value".to_variant(), &false.to_variant());
+        opts.push(extrude.upcast_any_dictionary());
         opts
     }
 
@@ -125,6 +133,7 @@ impl IEditorImportPlugin for AseAnimationLibraryImporter {
             slice_tracks,
             split_layers,
             create_reset,
+            convert::AtlasParams::from_dict(&options),
         ) {
             Ok(l) => l,
             Err(e) => {

@@ -88,6 +88,14 @@ impl IEditorImportPlugin for AseSceneImporter {
         autoplay.set(&"name".to_variant(), &"autoplay".to_variant());
         autoplay.set(&"default_value".to_variant(), &true.to_variant());
         opts.push(autoplay.upcast_any_dictionary());
+        let mut pad = VarDictionary::new();
+        pad.set(&"name".to_variant(), &"atlas_padding".to_variant());
+        pad.set(&"default_value".to_variant(), &1.to_variant());
+        opts.push(pad.upcast_any_dictionary());
+        let mut extrude = VarDictionary::new();
+        extrude.set(&"name".to_variant(), &"atlas_extrude".to_variant());
+        extrude.set(&"default_value".to_variant(), &false.to_variant());
+        opts.push(extrude.upcast_any_dictionary());
         opts
     }
 
@@ -108,13 +116,14 @@ impl IEditorImportPlugin for AseSceneImporter {
         };
         let file = ConvertOptions::from_dict(&options).apply(&file);
 
-        let frames = match convert::build_sprite_frames(&file) {
-            Ok(f) => f,
-            Err(e) => {
-                godot_error!("aseprite-gd: {source_file}: {e}");
-                return Error::ERR_CANT_CREATE;
-            }
-        };
+        let frames =
+            match convert::build_sprite_frames(&file, convert::AtlasParams::from_dict(&options)) {
+                Ok(f) => f,
+                Err(e) => {
+                    godot_error!("aseprite-gd: {source_file}: {e}");
+                    return Error::ERR_CANT_CREATE;
+                }
+            };
 
         // Root named after the file, sprite child playing the first animation.
         let mut root = Node2D::new_alloc();

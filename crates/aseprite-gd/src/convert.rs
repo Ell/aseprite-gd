@@ -14,6 +14,37 @@ use godot::classes::{
 };
 use godot::prelude::*;
 
+/// Atlas packing knobs shared by the animation importers.
+#[derive(Clone, Copy)]
+pub struct AtlasParams {
+    pub padding: u32,
+    pub extrude: bool,
+}
+
+impl AtlasParams {
+    pub fn from_dict(options: &VarDictionary) -> Self {
+        AtlasParams {
+            padding: options
+                .get(&"atlas_padding".to_variant())
+                .map(|v| v.to::<i64>().clamp(0, 16) as u32)
+                .unwrap_or(1),
+            extrude: options
+                .get(&"atlas_extrude".to_variant())
+                .map(|v| v.booleanize())
+                .unwrap_or(false),
+        }
+    }
+}
+
+impl Default for AtlasParams {
+    fn default() -> Self {
+        AtlasParams {
+            padding: 1,
+            extrude: false,
+        }
+    }
+}
+
 /// Options shared by the importers.
 pub struct ConvertOptions {
     /// Comma-separated, case-sensitive substrings; layers whose names contain
@@ -155,13 +186,16 @@ pub fn animations(file: &AseFile) -> Vec<Anim> {
 
 /// Renders every frame, packs a trimmed/deduped atlas, and returns one
 /// canvas-sized AtlasTexture per frame (trim offsets restored via margins).
-pub fn frame_atlas_textures(file: &AseFile) -> Result<Vec<Gd<AtlasTexture>>, String> {
+pub fn frame_atlas_textures(
+    file: &AseFile,
+    atlas_params: AtlasParams,
+) -> Result<Vec<Gd<AtlasTexture>>, String> {
     let rendered: Vec<_> = (0..file.frames.len())
         .map(|i| render_frame(file, i).map_err(|e| e.to_string()))
         .collect::<Result<_, _>>()?;
     // Godot rejects textures above 16384px on a side; the packer splits
     // pages under that cap.
-    let atlas = crate::atlas::pack(&rendered, 1, 16384);
+    let atlas = crate::atlas::pack(&rendered, atlas_params.padding, 16384, atlas_params.extrude);
 
     let sheets: Vec<Gd<ImageTexture>> = atlas
         .pages
@@ -210,9 +244,12 @@ pub fn frame_atlas_textures(file: &AseFile) -> Result<Vec<Gd<AtlasTexture>>, Str
 /// "default" when untagged). Animation fps is fixed at 1000 so per-frame
 /// durations in ms map exactly onto SpriteFrames' relative durations. All
 /// frames share one packed atlas.
-pub fn build_sprite_frames(file: &AseFile) -> Result<Gd<SpriteFrames>, String> {
+pub fn build_sprite_frames(
+    file: &AseFile,
+    atlas_params: AtlasParams,
+) -> Result<Gd<SpriteFrames>, String> {
     let mut frames = SpriteFrames::new_gd();
-    let textures = frame_atlas_textures(file)?;
+    let textures = frame_atlas_textures(file, atlas_params)?;
 
     let default_name = StringName::from("default");
     if !file.tags.is_empty() {
@@ -248,6 +285,7 @@ pub fn build_animation_library(
     slice_tracks: bool,
     split_layers: bool,
     create_reset: bool,
+    atlas_params: AtlasParams,
 ) -> Result<Gd<AnimationLibrary>, String> {
     use godot::classes::animation::{LoopMode, TrackType, UpdateMode};
 
@@ -255,15 +293,15 @@ pub fn build_animation_library(
     // "<sprite_path>/<layer>:texture" — sprite_path is the container node
     // holding one sprite child per layer. Playing one animation drives all
     // layers in sync.
-    let split_units: Vec<(String, Vec<Gd<AtlasTexture>>)> = if split_layers {
-        split_atlas_textures(file)?
+    let split_units: Vec<UnitTextures> = if split_layers {
+        split_atlas_textures(file, atlas_params)?
     } else {
         Vec::new()
     };
     let textures = if split_layers {
         Vec::new()
     } else {
-        frame_atlas_textures(file)?
+        frame_atlas_textures(file, atlas_params)?
     };
     let mut library = AnimationLibrary::new_gd();
 
@@ -389,12 +427,15 @@ pub fn build_animation_library(
         let mut reset = Animation::new_gd();
         reset.set_length(0.001);
         let units: Vec<(String, Gd<AtlasTexture>)> = if split_layers {
-            split_atlas_textures(file)?
+            split_atlas_textures(file, atlas_params)?
                 .into_iter()
                 .map(|(n, mut t)| (n, t.remove(0)))
                 .collect()
         } else {
-            vec![("".to_string(), frame_atlas_textures(file)?.remove(0))]
+            vec![(
+                "".to_string(),
+                frame_atlas_textures(file, atlas_params)?.remove(0),
+            )]
         };
         for (unit, texture) in units {
             let track = reset.add_track(TrackType::VALUE);
@@ -792,7 +833,10 @@ pub type UnitTextures = (String, Vec<Gd<AtlasTexture>>);
 
 /// Per-unit frame textures for split-layer imports. All units' frames share
 /// one packed atlas (identical/empty renders dedup across units).
-pub fn split_atlas_textures(file: &AseFile) -> Result<Vec<UnitTextures>, String> {
+pub fn split_atlas_textures(
+    file: &AseFile,
+    atlas_params: AtlasParams,
+) -> Result<Vec<UnitTextures>, String> {
     let units = split_units(file);
     if units.is_empty() {
         return Err("no visible layers to split".to_string());
@@ -806,7 +850,7 @@ pub fn split_atlas_textures(file: &AseFile) -> Result<Vec<UnitTextures>, String>
             renders.push(render_frame(&isolated, f).map_err(|e| e.to_string())?);
         }
     }
-    let atlas = crate::atlas::pack(&renders, 1, 16384);
+    let atlas = crate::atlas::pack(&renders, atlas_params.padding, 16384, atlas_params.extrude);
 
     let sheets: Vec<Gd<ImageTexture>> = atlas
         .pages
@@ -853,10 +897,13 @@ pub fn split_atlas_textures(file: &AseFile) -> Result<Vec<UnitTextures>, String>
 /// Split-mode SpriteFrames: one animation per layer per tag, named
 /// "<layer>/<tag>". Stack one AnimatedSprite2D per layer and play the same
 /// tag on each for multi-layer characters.
-pub fn build_sprite_frames_split(file: &AseFile) -> Result<Gd<SpriteFrames>, String> {
+pub fn build_sprite_frames_split(
+    file: &AseFile,
+    atlas_params: AtlasParams,
+) -> Result<Gd<SpriteFrames>, String> {
     let mut frames = SpriteFrames::new_gd();
     frames.remove_animation(&StringName::from("default"));
-    let units = split_atlas_textures(file)?;
+    let units = split_atlas_textures(file, atlas_params)?;
 
     for (unit_name, textures) in &units {
         for anim in animations(file) {

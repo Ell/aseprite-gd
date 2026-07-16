@@ -13,6 +13,8 @@ dest_files=["res://.godot/imported/blend_multiply.aseprite-0f72dc00cee3aece8d4b7
 [params]
 
 exclude_layers=""
+exclude_tags=""
 include_hidden_layers=false
 post_import_script=""
 frame=0
+slice=""

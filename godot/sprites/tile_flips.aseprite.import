@@ -13,5 +13,6 @@ dest_files=["res://.godot/imported/tile_flips.aseprite-7e3c2317b4a897d6885f1e849
 [params]
 
 exclude_layers=""
+exclude_tags=""
 include_hidden_layers=false
 post_import_script=""

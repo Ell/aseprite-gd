@@ -13,5 +13,6 @@ dest_files=["res://.godot/imported/tileset_sample.aseprite-8e178e7120d3e20d57af3
 [params]
 
 exclude_layers=""
+exclude_tags=""
 include_hidden_layers=false
 post_import_script=""

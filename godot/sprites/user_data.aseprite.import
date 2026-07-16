@@ -20,3 +20,5 @@ sprite_path="Sprite2D"
 create_reset_animation=true
 split_layers=false
 slice_tracks=false
+atlas_padding=1
+atlas_extrude=false

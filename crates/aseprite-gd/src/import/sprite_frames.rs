@@ -70,6 +70,14 @@ impl IEditorImportPlugin for AseSpriteFramesImporter {
         split.set(&"name".to_variant(), &"split_layers".to_variant());
         split.set(&"default_value".to_variant(), &false.to_variant());
         opts.push(split.upcast_any_dictionary());
+        let mut pad = VarDictionary::new();
+        pad.set(&"name".to_variant(), &"atlas_padding".to_variant());
+        pad.set(&"default_value".to_variant(), &1.to_variant());
+        opts.push(pad.upcast_any_dictionary());
+        let mut extrude = VarDictionary::new();
+        extrude.set(&"name".to_variant(), &"atlas_extrude".to_variant());
+        extrude.set(&"default_value".to_variant(), &false.to_variant());
+        opts.push(extrude.upcast_any_dictionary());
         opts
     }
 
@@ -95,9 +103,9 @@ impl IEditorImportPlugin for AseSpriteFramesImporter {
             .map(|v| v.booleanize())
             .unwrap_or(false);
         let frames = match if split_layers {
-            convert::build_sprite_frames_split(&file)
+            convert::build_sprite_frames_split(&file, convert::AtlasParams::from_dict(&options))
         } else {
-            convert::build_sprite_frames(&file)
+            convert::build_sprite_frames(&file, convert::AtlasParams::from_dict(&options))
         } {
             Ok(f) => f,
             Err(e) => {

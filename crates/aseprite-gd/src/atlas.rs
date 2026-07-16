@@ -91,9 +91,11 @@ fn trim(img: &RgbaImage) -> Trimmed {
 }
 
 /// Packs frames into atlas pages no larger than `max_dim` on either side.
-/// `padding` pixels of transparent space separate placements (bleed
-/// protection when filtering).
-pub fn pack(frames: &[RgbaImage], padding: u32, max_dim: u32) -> Atlas {
+/// `padding` pixels of space separate placements; with `extrude`, each
+/// placement's edge pixels are replicated one pixel into that gutter
+/// (bleed-proof under filtering and mipmaps; needs padding >= 1, and
+/// extruded pixels never collide because placements stay padding apart).
+pub fn pack(frames: &[RgbaImage], padding: u32, max_dim: u32, extrude: bool) -> Atlas {
     // Dedup identical trimmed frames, preserving first-seen order for
     // determinism.
     let mut unique: Vec<Trimmed> = Vec::new();
@@ -196,12 +198,58 @@ pub fn pack(frames: &[RgbaImage], padding: u32, max_dim: u32) -> Atlas {
             let dst = ((p.y as usize + row) * pg.width as usize + p.x as usize) * 4;
             pg.pixels[dst..dst + src.len()].copy_from_slice(src);
         }
+        if extrude && padding >= 1 {
+            extrude_placement(pg, p);
+        }
     }
 
     Atlas {
         pages,
         placements,
         frame_to_placement,
+    }
+}
+
+/// Replicates a placement's border pixels one pixel outward.
+fn extrude_placement(page: &mut AtlasPage, p: &Placement) {
+    let w = page.width as usize;
+    let (px, py, pw, ph) = (
+        p.x as usize,
+        p.y as usize,
+        p.width as usize,
+        p.height as usize,
+    );
+    let get = |pixels: &[u8], x: usize, y: usize| -> [u8; 4] {
+        pixels[(y * w + x) * 4..][..4].try_into().unwrap()
+    };
+    let put = |pixels: &mut [u8], x: usize, y: usize, v: [u8; 4]| {
+        pixels[(y * w + x) * 4..][..4].copy_from_slice(&v);
+    };
+    // Left/right columns.
+    for y in py..py + ph {
+        if px > 0 {
+            let v = get(&page.pixels, px, y);
+            put(&mut page.pixels, px - 1, y, v);
+        }
+        if px + pw < w {
+            let v = get(&page.pixels, px + pw - 1, y);
+            put(&mut page.pixels, px + pw, y, v);
+        }
+    }
+    // Top/bottom rows (including diagonal corners).
+    let h = page.height as usize;
+    let x0 = px.saturating_sub(1);
+    let x1 = (px + pw + 1).min(w);
+    for x in x0..x1 {
+        let sx = x.clamp(px, px + pw - 1);
+        if py > 0 {
+            let v = get(&page.pixels, sx, py);
+            put(&mut page.pixels, x, py - 1, v);
+        }
+        if py + ph < h {
+            let v = get(&page.pixels, sx, py + ph - 1);
+            put(&mut page.pixels, x, py + ph, v);
+        }
     }
 }
 
@@ -244,7 +292,7 @@ mod tests {
             img(16, 16, (2, 2, 4, 4)),
             img(16, 16, (8, 8, 2, 2)),
         ];
-        let atlas = pack(&frames, 1, 16384);
+        let atlas = pack(&frames, 1, 16384, false);
         assert_eq!(atlas.placements.len(), 2, "two unique images");
         assert_eq!(atlas.frame_to_placement, vec![0, 0, 1]);
     }
@@ -252,8 +300,8 @@ mod tests {
     #[test]
     fn packing_is_deterministic_and_lossless() {
         let frames: Vec<RgbaImage> = (0..6).map(|i| img(32, 32, (i, i, 5 + i, 3 + i))).collect();
-        let a = pack(&frames, 1, 16384);
-        let b = pack(&frames, 1, 16384);
+        let a = pack(&frames, 1, 16384, false);
+        let b = pack(&frames, 1, 16384, false);
         assert_eq!(a.pages[0].pixels, b.pages[0].pixels);
         assert_eq!(a.pages[0].width, b.pages[0].width);
         // Every placement's pixels must match its trimmed source.
@@ -282,7 +330,7 @@ mod tests {
                 f
             })
             .collect();
-        let atlas = pack(&frames, 1, 24);
+        let atlas = pack(&frames, 1, 24, false);
         assert!(atlas.pages.len() > 1, "expected a page split");
         for page in &atlas.pages {
             assert!(page.width <= 24 && page.height <= 24);
@@ -291,6 +339,27 @@ mod tests {
         for &pi in &atlas.frame_to_placement {
             let p = &atlas.placements[pi];
             assert!(p.page < atlas.pages.len());
+        }
+    }
+
+    #[test]
+    fn extrude_replicates_edges_into_the_gutter() {
+        // One 2x2 red square at canvas origin; padding 2, extrude on.
+        let frames = vec![img(2, 2, (0, 0, 2, 2))];
+        let atlas = pack(&frames, 2, 16384, true);
+        let p = &atlas.placements[0];
+        let page = &atlas.pages[0];
+        let px = |x: u32, y: u32| {
+            let i = ((y * page.width + x) * 4) as usize;
+            &page.pixels[i..i + 4]
+        };
+        // Pixel right of the placement's right edge replicates it.
+        if p.x + p.width < page.width {
+            assert_eq!(px(p.x + p.width, p.y), &[255, 0, 0, 255]);
+        }
+        // Below the bottom edge too.
+        if p.y + p.height < page.height {
+            assert_eq!(px(p.x, p.y + p.height), &[255, 0, 0, 255]);
         }
     }
 }

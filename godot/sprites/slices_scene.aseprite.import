@@ -13,5 +13,9 @@ dest_files=["res://.godot/imported/slices_scene.aseprite-01f10a5bed589f4498b2cff
 [params]
 
 exclude_layers=""
+exclude_tags=""
 include_hidden_layers=false
 post_import_script="res://hooks/add_slice_hitboxes.gd"
+autoplay=true
+atlas_padding=1
+atlas_extrude=false

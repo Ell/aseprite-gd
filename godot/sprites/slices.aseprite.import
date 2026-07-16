@@ -13,6 +13,7 @@ dest_files=["res://.godot/imported/slices.aseprite-8611d2be98243670383388724aaed
 [params]
 
 exclude_layers=""
+exclude_tags=""
 include_hidden_layers=false
 post_import_script=""
 slice_name=""

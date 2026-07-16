@@ -21,6 +21,8 @@ timings, and all frames share one trimmed, deduplicated atlas.
 | `include_hidden_layers` | `false` | Also render layers that are hidden in Aseprite. |
 | `exclude_tags` | `""` | Comma-separated, case-sensitive substrings; tags whose names contain any of them produce no animations. |
 | `post_import_script` | `""` | Path to a hook script whose `_post_import` runs on the built resource before it is saved — see [post-import-hooks.md](../post-import-hooks.md). |
+| `atlas_padding` | `1` | Pixels of space between packed frames (0-16). |
+| `atlas_extrude` | `false` | Replicate each frame's edge pixels one pixel into the padding gutter — prevents bleeding under filtering or mipmaps. Needs padding of at least 1. |
 | `split_layers` | `false` | One animation per visible leaf layer per tag, named `<layer>/<tag>`, all sharing one atlas. Stack one AnimatedSprite2D per layer and play the same tag on each for multi-layer characters. |
 
 ## What maps to what

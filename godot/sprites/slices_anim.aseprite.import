@@ -13,7 +13,12 @@ dest_files=["res://.godot/imported/slices_anim.aseprite-bbc3bea2fbeb4ae765fe1649
 [params]
 
 exclude_layers=""
+exclude_tags=""
 include_hidden_layers=false
 post_import_script=""
 sprite_path="Sprite2D"
+create_reset_animation=false
+split_layers=false
 slice_tracks=true
+atlas_padding=1
+atlas_extrude=false
