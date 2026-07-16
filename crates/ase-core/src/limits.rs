@@ -19,3 +19,8 @@ pub const MAX_PROPERTY_DEPTH: u32 = 128;
 
 /// Maximum palette entries we accept (the format allows >256; §6.10).
 pub const MAX_PALETTE_ENTRIES: u32 = 65_536;
+
+/// Maximum tiles in one tileset (§6.13). Bounds both the decompressed strip
+/// size and the per-tile user data allocation — external tilesets carry no
+/// pixel data, so `num_tiles` would otherwise be an unchecked allocation size.
+pub const MAX_TILESET_TILES: u32 = 1 << 20;
