@@ -30,6 +30,17 @@ teammates' machines, and in headless CI.
   queries from GDScript
 - Headless CI imports work with zero external dependencies
 
+## Documentation
+
+- [Getting started](docs/getting-started.md) — install, first import, importer overview
+- [Importer walkthroughs](docs/importers/) — one guide per import product
+- [Cookbook](docs/cookbook.md) — short task-oriented recipes
+- [TileSet workflow](docs/tileset-workflow.md) — collision/terrain that survives reimports
+- [Runtime API](docs/runtime-api.md) — `AseDocument`, runtime `load()`, TileSet sync
+- [Troubleshooting](docs/troubleshooting.md)
+
+Working example scenes live in [godot/examples/](godot/examples/).
+
 ## Repository layout
 
 - `crates/ase-core` — parser + compositor, no Godot dependencies
