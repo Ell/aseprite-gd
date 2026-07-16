@@ -73,10 +73,13 @@ godot --headless --path godot --import   # must succeed with zero external deps
   methods from background threads (gdext#597). Keep loader/importer state
   `Send`-safe and minimal.
 - Editor classes need `#[class(tool)]`. Do NOT ship an auto-registered
-  `EditorPlugin` subclass: a GDExtension EditorPlugin instantiating during a
-  cold first project scan segfaults Godot 4.7 headless. Importers are
+  `EditorPlugin` subclass: cold headless imports of GDExtension projects hit
+  an engine teardown race (godot#111645, open) and an auto-instantiated
+  extension EditorPlugin makes the crash deterministic. Importers are
   bootstrapped from `godot/addons/aseprite_gd/plugin.gd` (a GDScript addon
-  plugin, which loads after the scan) via `ClassDB.instantiate`.
+  plugin, standard addon shape, loads after the scan) via
+  `ClassDB.instantiate`. Cold `--import` may still exit nonzero AFTER
+  successfully importing (see the CI workflow's run-twice pattern).
 - Don't touch `Gd<Self>` in `init()` — it panics (gdext#997); wire signals in
   `enter_tree()`/`ready()`.
 - Implement `get_priority`/`get_import_order` explicitly on import plugins —

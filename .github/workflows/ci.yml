@@ -92,10 +92,11 @@ jobs:
       - name: headless import
         shell: bash
         run: |
-          # Cold first scan with a GDExtension can segfault Godot 4.7 at the
-          # editor-layout stage AFTER imports complete (engine bug; warm runs
-          # are clean). Tolerate the cold run's exit code; the warm run and
-          # the resource verification below are the real gates.
+          # godot#111645: cold --import with a GDExtension segfaults after
+          # imports complete (freed DocTools hit by a deferred
+          # _gen_extensions_docs call; warm runs short-circuit via the editor
+          # cache). Open upstream as of 4.8-dev. Tolerate the cold run's exit;
+          # the warm run and the resource verification below are the gates.
           godot --headless --path godot --import 2>&1 | tee import-cold.log || true
           godot --headless --path godot --import 2>&1 | tee import.log
           # a missing/broken extension library does NOT make --import exit
