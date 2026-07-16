@@ -4,6 +4,8 @@
 
 use godot::prelude::*;
 
+pub mod convert;
+pub mod import;
 pub mod plugin;
 
 struct AsepriteGdExtension;

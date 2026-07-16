@@ -1,28 +1,40 @@
-//! EditorPlugin registration. Import plugins, docks, and inspector plugins get
-//! wired up here as they land (see docs/architecture.md "gdext layer").
+//! EditorPlugin registration. gdext auto-instantiates EditorPlugin subclasses
+//! in the editor; importers are added here and removed on unload.
 //!
-//! Editor classes must be `#[class(tool)]`; gdext auto-registers EditorPlugin
-//! subclasses with the editor. Note: wiring that needs `Gd<Self>` belongs in
-//! `enter_tree`, not `init` (gdext#997).
+//! Wiring that needs `Gd<Self>` belongs in `enter_tree`, not `init`
+//! (gdext#997).
 
-use godot::classes::{EditorPlugin, IEditorPlugin};
+use godot::classes::{EditorImportPlugin, EditorPlugin, IEditorPlugin};
 use godot::prelude::*;
+
+use crate::import::sprite_frames::AseSpriteFramesImporter;
+use crate::import::texture::AseTextureImporter;
 
 #[derive(GodotClass)]
 #[class(tool, init, base=EditorPlugin)]
 pub struct AsepriteImporterPlugin {
+    texture: Option<Gd<EditorImportPlugin>>,
+    sprite_frames: Option<Gd<EditorImportPlugin>>,
     base: Base<EditorPlugin>,
 }
 
 #[godot_api]
 impl IEditorPlugin for AsepriteImporterPlugin {
     fn enter_tree(&mut self) {
-        godot_print!("aseprite-gd: editor plugin loaded (importers not yet registered)");
-        // TODO: add_import_plugin() calls for texture / SpriteFrames /
-        // AnimationLibrary / TileSet importers as they are implemented.
+        let texture = AseTextureImporter::new_gd().upcast::<EditorImportPlugin>();
+        let sprite_frames = AseSpriteFramesImporter::new_gd().upcast::<EditorImportPlugin>();
+        self.base_mut().add_import_plugin(&texture);
+        self.base_mut().add_import_plugin(&sprite_frames);
+        self.texture = Some(texture);
+        self.sprite_frames = Some(sprite_frames);
     }
 
     fn exit_tree(&mut self) {
-        // TODO: remove_import_plugin() in reverse order.
+        if let Some(p) = self.sprite_frames.take() {
+            self.base_mut().remove_import_plugin(&p);
+        }
+        if let Some(p) = self.texture.take() {
+            self.base_mut().remove_import_plugin(&p);
+        }
     }
 }
