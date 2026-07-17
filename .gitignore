@@ -2,3 +2,4 @@
 godot/.godot/
 *.import
 !godot/sprites/*.import
+godot/dual_tiles.tres

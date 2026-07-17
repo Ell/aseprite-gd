@@ -150,6 +150,14 @@ func _init():
     var opts_ok = reset_ok and stex_ok
     print("option_features: reset=", reset_ok, " slice_tex=", stex_ok)
 
+    # Dual output: one file imports as SpriteFrames while a hook syncs its
+    # tilesets into a TileSet resource on every reimport.
+    var dual_sf = load("res://sprites/dual.aseprite")
+    var dual_ts = load("res://dual_tiles.tres")
+    var dual_ok = dual_sf is SpriteFrames and dual_ts is TileSet \
+        and dual_ts.get_source_count() == 1 and dual_ts.get_source(0).get_tiles_count() > 0
+    print("dual_output: ok=", dual_ok)
+
     # Split-by-layer: one animation per visible leaf layer, isolated pixels.
     var split = load("res://sprites/split_layers.aseprite")
     var split_ok = false
@@ -182,7 +190,7 @@ func _init():
         hroot.free()
 
 
-    var ok = tex is Texture2D and sf is SpriteFrames and sf.get_animation_names().size() == 3 and doc_ok and atlas_ok and lib_ok and tset_ok and sb_ok and custom_ok and rt_ok and ct_ok and slices_ok and sync_ok and strk_ok and hooks_ok and split_ok and opts_ok
+    var ok = tex is Texture2D and sf is SpriteFrames and sf.get_animation_names().size() == 3 and doc_ok and atlas_ok and lib_ok and tset_ok and sb_ok and custom_ok and rt_ok and ct_ok and slices_ok and sync_ok and strk_ok and hooks_ok and split_ok and opts_ok and dual_ok
     # Non-destructive AnimationPlayer merge: hand-made tracks and animations
     # survive re-import; imported tracks update without duplicating.
     var player := AnimationPlayer.new()

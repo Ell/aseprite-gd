@@ -54,6 +54,33 @@ With collision/terrain: keep your own TileSet resource and sync into it —
 see [tileset-workflow.md](tileset-workflow.md). Per-tile user data text shows
 up in the `aseprite_text` custom data layer either way.
 
+## One file as both animation and tileset
+
+Godot allows one importer per file, but the sync API reads files directly,
+so a mixed file (character layers plus a tilemap layer) can feed both:
+
+1. Import the file as SpriteFrames, with `exclude_layers` hiding the tilemap
+   layer so it stays out of the animation frames.
+2. Set a post-import hook that refreshes a TileSet resource on every
+   reimport (the demo project ships this as `hooks/sync_tileset.gd`):
+
+```gdscript
+@tool
+extends RefCounted
+
+const TILESET_PATH := "res://world/tiles.tres"
+
+func _post_import(resource: Resource, _doc: AseDocument,
+        _options: Dictionary, source_file: String) -> Resource:
+    var ts: TileSet = load(TILESET_PATH) if ResourceLoader.exists(TILESET_PATH) else TileSet.new()
+    if AseTilesetSync.sync(ts, source_file) > 0:
+        ResourceSaver.save(ts, TILESET_PATH)
+    return resource
+```
+
+Collision and terrain authored on that TileSet survive, per the usual sync
+guarantees.
+
 ## 9-patch UI panels
 
 Give the slice a center rect in Aseprite (slice properties → 9-slices),
