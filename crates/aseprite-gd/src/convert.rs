@@ -650,6 +650,15 @@ pub fn sync_tileset_into(file: &AseFile, tile_set: &mut Gd<TileSet>) -> Result<u
         };
         source.set_texture(&texture);
         source.set_texture_region_size(Vector2i::new(tw, th));
+        // Shown in the TileSet panel's source list: "<name> (<id>)", with a
+        // generic fallback for unnamed tilesets. Refreshed on every sync —
+        // the Aseprite name is the source of truth.
+        let display = if ts.name.is_empty() {
+            format!("Tileset ({id})")
+        } else {
+            format!("{} ({id})", ts.name)
+        };
+        source.set_name(&GString::from(display.as_str()));
 
         // Drop tiles that no longer exist in the file (their coords lie past
         // the current tile count in the fixed-column layout).

@@ -53,7 +53,8 @@ func _init():
         if src_count > 0:
             var src = tset.get_source(tset.get_source_id(0))
             tset_ok = src is TileSetAtlasSource and src.get_tiles_count() > 0 \
-                and tset.tile_size == Vector2i(2, 2)
+                and tset.tile_size == Vector2i(2, 2) \
+                and src.resource_name == "Tileset (0)"
             print("tileset: sources=", src_count, " tiles=", src.get_tiles_count(), " tile_size=", tset.tile_size, " ok=", tset_ok)
 
     # 9-patch slice -> StyleBoxTexture with margins from the center rect.

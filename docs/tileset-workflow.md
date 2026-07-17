@@ -37,6 +37,8 @@ ResourceSaver.save(tile_set, "res://world/tiles.tres")
   layer definitions, other sources, and scene-collection sources all survive.
 - Per-tile user data from Aseprite refreshes the `aseprite_text` custom data
   layer (created on first sync when needed).
+- Source display names refresh from the Aseprite tileset names
+  ("<name> (<id>)"), so renames belong in Aseprite, not the TileSet panel.
 
 Re-run the sync whenever the art changes; wire it into a save hook or an
 EditorScript shortcut if you want it automatic.

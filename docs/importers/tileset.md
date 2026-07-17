@@ -84,3 +84,7 @@ you own.
   embedded tilesets fails to import with `no embedded tilesets in file`.
 - The `aseprite_text` custom data layer is a plain string; parse it yourself
   if you encode structured data.
+
+Each atlas source is named "<tileset name> (<id>)" in the TileSet panel
+("Tileset (<id>)" when unnamed in Aseprite); the name refreshes from the
+file on every import or sync.
