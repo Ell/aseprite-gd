@@ -18,7 +18,14 @@ teammates' machines, and in headless CI.
 - Tags become animations with exact per-frame durations, loop modes, and
   ping-pong unrolling; frames share a trimmed, deduped, multi-page atlas
 - Aseprite tilesets import as configured `TileSet` atlas sources; per-tile
-  user data lands in a custom data layer
+  user data lands in a custom data layer. A sync API updates TileSets you
+  own without touching collision, terrain, or navigation authored in Godot,
+  and can keep the sheet in a standalone texture file instead of embedding it
+- Named regions — slices, or tiles named with the bundled Aseprite dialog —
+  extract to folders of `AtlasTexture` files over one shared sheet
+  (`extract_dir`): drag-and-drop sprites that refresh with the art
+- Asset-pack sheets split on a grid (`split_grid`): cells as indexable
+  frames, or `<tag>_<cell>` animation sets when combined with tags
 - 9-patch slices become `StyleBoxTexture`s; slice rects/pivots/user data are
   queryable at runtime
 - Layers named `normal`/`specular`/`emission` become `CanvasTexture` maps for

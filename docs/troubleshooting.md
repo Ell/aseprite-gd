@@ -96,6 +96,13 @@ Fix in Aseprite: create a tilemap layer (*Layer → New → New Tilemap Layer*)
 and draw tiles into it — tilesets created this way are embedded. External
 tileset files are not supported.
 
+## "a sheet path with multiple embedded tilesets is not supported yet"
+
+`AseTilesetSync.sync_with_sheet` writes one sheet file, and a file with
+several embedded tilesets would need one per source. Use plain `sync` for
+those files (textures embed in the TileSet), or split the tilesets across
+separate Aseprite files.
+
 ## "no 9-patch slice in file"
 
 The StyleBoxTexture importer, with `slice_name` left empty, picks the first

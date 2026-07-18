@@ -196,6 +196,16 @@ func _init():
         and ResourceLoader.exists("res://extracted_slices/hitbox.tres")
     print("extraction: tile=", ex_tile.get_size() if ex_tile else null, " slice=", ex_slice.get_size() if ex_slice else null, " ok=", extract_ok)
 
+    # Import-pipeline shared sheet: tile_flips extracts named tiles AND its
+    # hook syncs res://shared_tiles.tres pointed at the extraction's sheet —
+    # the TileSet and the extracted AtlasTexture must share one texture.
+    var pipe_ts = load("res://shared_tiles.tres")
+    var pipe_ok = false
+    if pipe_ts is TileSet and ex_tile is AtlasTexture:
+        pipe_ok = pipe_ts.get_source(pipe_ts.get_source_id(0)).texture == ex_tile.atlas \
+            and ex_tile.atlas.resource_path == "res://extracted_tiles/sheet.res"
+    print("pipeline_shared_sheet: ok=", pipe_ok)
+
     # Dual output: one file imports as SpriteFrames while a hook syncs its
     # tilesets into a TileSet resource on every reimport.
     var dual_sf = load("res://sprites/dual.aseprite")
@@ -243,7 +253,7 @@ func _init():
         hroot.free()
 
 
-    var ok = tex is Texture2D and sf is SpriteFrames and sf.get_animation_names().size() == 3 and doc_ok and atlas_ok and lib_ok and tset_ok and sb_ok and custom_ok and rt_ok and ct_ok and slices_ok and sync_ok and shsheet_ok and strk_ok and hooks_ok and split_ok and opts_ok and dual_ok and grid_ok and ganim_ok and extract_ok
+    var ok = tex is Texture2D and sf is SpriteFrames and sf.get_animation_names().size() == 3 and doc_ok and atlas_ok and lib_ok and tset_ok and sb_ok and custom_ok and rt_ok and ct_ok and slices_ok and sync_ok and shsheet_ok and strk_ok and hooks_ok and split_ok and opts_ok and dual_ok and grid_ok and ganim_ok and extract_ok and pipe_ok
     # Non-destructive AnimationPlayer merge: hand-made tracks and animations
     # survive re-import; imported tracks update without duplicating.
     var player := AnimationPlayer.new()
@@ -303,7 +313,7 @@ func _init():
 
     # Example scenes must instantiate with their imported resources wired up.
     var scene_ok = true
-    for scene_path in ["res://examples/animated_character.tscn", "res://examples/ui_panel.tscn", "res://examples/lit_sprite.tscn", "res://examples/animation_player.tscn"]:
+    for scene_path in ["res://examples/animated_character.tscn", "res://examples/ui_panel.tscn", "res://examples/lit_sprite.tscn", "res://examples/animation_player.tscn", "res://examples/shared_sheet.tscn"]:
         var ps = load(scene_path)
         var inst = ps.instantiate() if ps != null else null
         if inst == null:

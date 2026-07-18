@@ -9,6 +9,7 @@ Each scene uses resources imported straight from the `.aseprite` files in
 | `animation_player.tscn` | AnimationPlayer with an imported AnimationLibrary |
 | `ui_panel.tscn` | Panel themed with a StyleBoxTexture from a 9-patch slice |
 | `lit_sprite.tscn` | Sprite2D with a CanvasTexture (normal-map layer) under a PointLight2D |
+| `shared_sheet.tscn` | TileMapLayer and Sprite2D drawing from one shared sheet: a hook syncs `shared_tiles.tres` against the same `sheet.res` the extraction writes |
 
 The `.import` files next to the sprites pin which importer each file uses —
 that's the only setup. `verify_import.gd` in the project root asserts all of
