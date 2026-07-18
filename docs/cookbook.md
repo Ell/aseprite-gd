@@ -40,6 +40,11 @@ var sheet: SpriteFrames = load("res://characters.aseprite")
 var hero: Texture2D = sheet.get_frame_texture("default", 9) # row-major index
 ```
 
+On a multi-frame file, `split_grid` instead produces one animation per cell
+playing that cell across the frames — the layout where each tile of the
+canvas is its own animation set (e.g. walk-down / walk-side / walk-up
+stacked vertically). Animations are named by cell index, row-major.
+
 Cells share one trimmed atlas, so blank and duplicate cells are free. Sheets
 whose regions are not a uniform grid should use slices instead (see the
 runtime API's `get_slices`).

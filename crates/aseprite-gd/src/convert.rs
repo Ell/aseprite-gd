@@ -1161,26 +1161,36 @@ pub fn build_sprite_frames_grid(
     let mut frames = SpriteFrames::new_gd();
     frames.remove_animation(&StringName::from("default"));
     let per_frame = cols * rows;
-    for f in 0..file.frames.len() {
-        let name = if file.frames.len() == 1 {
-            "default".to_string()
-        } else {
-            f.to_string()
-        };
-        let name = StringName::from(name.as_str());
+    if file.frames.len() == 1 {
+        // One frame: a palette of cells, indexable under "default".
+        let name = StringName::from("default");
         frames.add_animation(&name);
         frames.set_animation_speed(&name, 1000.0);
         frames.set_animation_loop(&name, true);
         for c in 0..per_frame {
             frames
-                .add_frame_ex(
-                    &name,
-                    &cell_texture(f * per_frame + c)
-                        .clone()
-                        .upcast::<Texture2D>(),
-                )
-                .duration(file.frames[f].duration_ms as f32)
+                .add_frame_ex(&name, &cell_texture(c).clone().upcast::<Texture2D>())
+                .duration(file.frames[0].duration_ms as f32)
                 .done();
+        }
+    } else {
+        // Animated sheet: each cell is an animation set across the frames.
+        for c in 0..per_frame {
+            let name = StringName::from(c.to_string().as_str());
+            frames.add_animation(&name);
+            frames.set_animation_speed(&name, 1000.0);
+            frames.set_animation_loop(&name, true);
+            for f in 0..file.frames.len() {
+                frames
+                    .add_frame_ex(
+                        &name,
+                        &cell_texture(f * per_frame + c)
+                            .clone()
+                            .upcast::<Texture2D>(),
+                    )
+                    .duration(file.frames[f].duration_ms as f32)
+                    .done();
+            }
         }
     }
     Ok(frames)

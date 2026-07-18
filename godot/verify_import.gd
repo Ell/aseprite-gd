@@ -159,6 +159,16 @@ func _init():
             and c0 is AtlasTexture and c0.get_size() == Vector2(8, 8)
         print("grid_split: cells=", gsheet.get_frame_count("default"), " cell0=", c0.get_size(), " ok=", grid_ok)
 
+    # Grid split on a multi-frame file: one animation per cell across frames.
+    var ganim = load("res://sprites/grid_anim.aseprite")
+    var ganim_ok = false
+    if ganim is SpriteFrames:
+        var names2 = ganim.get_animation_names()
+        ganim_ok = names2.size() == 4 and ganim.has_animation("0") \
+            and ganim.get_frame_count("0") == 8 \
+            and ganim.get_frame_duration("0", 0) == 200.0
+        print("grid_anim: anims=", names2.size(), " frames=", ganim.get_frame_count("0"), " ok=", ganim_ok)
+
     # Dual output: one file imports as SpriteFrames while a hook syncs its
     # tilesets into a TileSet resource on every reimport.
     var dual_sf = load("res://sprites/dual.aseprite")
@@ -199,7 +209,7 @@ func _init():
         hroot.free()
 
 
-    var ok = tex is Texture2D and sf is SpriteFrames and sf.get_animation_names().size() == 3 and doc_ok and atlas_ok and lib_ok and tset_ok and sb_ok and custom_ok and rt_ok and ct_ok and slices_ok and sync_ok and strk_ok and hooks_ok and split_ok and opts_ok and dual_ok and grid_ok
+    var ok = tex is Texture2D and sf is SpriteFrames and sf.get_animation_names().size() == 3 and doc_ok and atlas_ok and lib_ok and tset_ok and sb_ok and custom_ok and rt_ok and ct_ok and slices_ok and sync_ok and strk_ok and hooks_ok and split_ok and opts_ok and dual_ok and grid_ok and ganim_ok
     # Non-destructive AnimationPlayer merge: hand-made tracks and animations
     # survive re-import; imported tracks update without duplicating.
     var player := AnimationPlayer.new()
