@@ -3,7 +3,7 @@
 GODOT ?= godot
 DEMO := godot
 
-.PHONY: help build build-release test check verify editor run preview corpus fuzz clean
+.PHONY: help build build-release test check verify editor run preview corpus fuzz clean install-cli
 
 help:
 	@echo "aseprite-gd targets:"
@@ -16,6 +16,7 @@ help:
 	@echo "  make verify        headless import + full resource verification of the demo project"
 	@echo "  make corpus        regenerate fixtures + goldens (needs Aseprite installed)"
 	@echo "  make fuzz          short fuzz pass over parse and render (needs cargo-fuzz)"
+	@echo "  make install-cli   install the ase inspector CLI (used by tools/yazi previewer)"
 	@echo "  make clean         remove build artifacts and the demo project's import cache"
 
 build:
@@ -52,6 +53,9 @@ corpus:
 fuzz:
 	cd crates/ase-core && cargo fuzz run parse -- -max_total_time=60
 	cd crates/ase-core && cargo fuzz run render -- -max_total_time=60
+
+install-cli:
+	cargo install --path crates/ase-cli
 
 clean:
 	cargo clean
