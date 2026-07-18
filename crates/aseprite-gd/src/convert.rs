@@ -1019,63 +1019,6 @@ pub fn build_sprite_frames_split(
     Ok(frames)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::ConvertOptions;
-
-    fn fixture() -> ase_core::AseFile {
-        let path = concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../ase-core/tests/fixtures/generated/group_blend.aseprite"
-        );
-        ase_core::AseFile::parse(&std::fs::read(path).unwrap()).unwrap()
-    }
-
-    #[test]
-    fn exclude_layers_takes_a_comma_separated_list() {
-        let file = fixture(); // layers: base, fx (group), inner_normal, inner_addition
-        let opts = ConvertOptions {
-            exclude_layers: "inner_normal, inner_addition".to_string(),
-            exclude_tags: String::new(),
-            include_hidden_layers: false,
-            snap_to_fps: 0.0,
-        };
-        let out = opts.apply(&file);
-        let vis: Vec<(&str, bool)> = out
-            .layers
-            .iter()
-            .map(|l| (l.name.as_str(), l.is_visible()))
-            .collect();
-        assert_eq!(
-            vis,
-            vec![
-                ("base", true),
-                ("fx", true),
-                ("inner_normal", false),
-                ("inner_addition", false)
-            ]
-        );
-
-        // Single pattern still works; empty string excludes nothing.
-        let one = ConvertOptions {
-            exclude_layers: "addition".into(),
-            exclude_tags: String::new(),
-            include_hidden_layers: false,
-            snap_to_fps: 0.0,
-        }
-        .apply(&file);
-        assert!(one.layers[2].is_visible() && !one.layers[3].is_visible());
-        let none = ConvertOptions {
-            exclude_layers: "".into(),
-            exclude_tags: String::new(),
-            include_hidden_layers: false,
-            snap_to_fps: 0.0,
-        }
-        .apply(&file);
-        assert!(none.layers.iter().all(|l| l.is_visible()));
-    }
-}
-
 /// Grid-split SpriteFrames for sheet files: each source frame's canvas is
 /// chopped into `cell_w` x `cell_h` cells (row-major, partial edge cells
 /// dropped), and every cell becomes a frame in the output. One source frame
@@ -1194,4 +1137,61 @@ pub fn build_sprite_frames_grid(
         }
     }
     Ok(frames)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ConvertOptions;
+
+    fn fixture() -> ase_core::AseFile {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../ase-core/tests/fixtures/generated/group_blend.aseprite"
+        );
+        ase_core::AseFile::parse(&std::fs::read(path).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn exclude_layers_takes_a_comma_separated_list() {
+        let file = fixture(); // layers: base, fx (group), inner_normal, inner_addition
+        let opts = ConvertOptions {
+            exclude_layers: "inner_normal, inner_addition".to_string(),
+            exclude_tags: String::new(),
+            include_hidden_layers: false,
+            snap_to_fps: 0.0,
+        };
+        let out = opts.apply(&file);
+        let vis: Vec<(&str, bool)> = out
+            .layers
+            .iter()
+            .map(|l| (l.name.as_str(), l.is_visible()))
+            .collect();
+        assert_eq!(
+            vis,
+            vec![
+                ("base", true),
+                ("fx", true),
+                ("inner_normal", false),
+                ("inner_addition", false)
+            ]
+        );
+
+        // Single pattern still works; empty string excludes nothing.
+        let one = ConvertOptions {
+            exclude_layers: "addition".into(),
+            exclude_tags: String::new(),
+            include_hidden_layers: false,
+            snap_to_fps: 0.0,
+        }
+        .apply(&file);
+        assert!(one.layers[2].is_visible() && !one.layers[3].is_visible());
+        let none = ConvertOptions {
+            exclude_layers: "".into(),
+            exclude_tags: String::new(),
+            include_hidden_layers: false,
+            snap_to_fps: 0.0,
+        }
+        .apply(&file);
+        assert!(none.layers.iter().all(|l| l.is_visible()));
+    }
 }

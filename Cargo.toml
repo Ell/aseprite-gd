@@ -4,7 +4,7 @@ members = ["crates/ase-core", "crates/ase-cli", "crates/aseprite-gd"]
 default-members = ["crates/ase-core", "crates/ase-cli"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 license = "MIT"
 
