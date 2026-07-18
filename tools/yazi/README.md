@@ -14,7 +14,7 @@ Setup:
 ```toml
 [plugin]
 prepend_previewers = [
-  { name = "*.aseprite", run = "aseprite" },
-  { name = "*.ase", run = "aseprite" },
+  { url = "*.aseprite", run = "aseprite" },
+  { url = "*.ase", run = "aseprite" },
 ]
 ```
