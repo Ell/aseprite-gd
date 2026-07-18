@@ -216,6 +216,20 @@ if synced > 0:
     ResourceSaver.save(tile_set, "res://world/tiles.tres")
 ```
 
+### sync_with_sheet(tile_set: TileSet, path: String, sheet_path: String) -> int (static)
+
+Like `sync`, but saves the atlas sheet as its own lossless texture file at
+`sheet_path` and references it from the TileSet instead of embedding a copy.
+The sheet file is owned by the sync — created on first use, updated in place
+(same path and UID) on every re-sync. Point `sheet_path` at an extraction's
+`sheet.res` to share one texture between the TileSet and the extracted
+AtlasTextures; see the "One sheet on disk" section of
+[tileset-workflow.md](tileset-workflow.md).
+
+Additional failure modes: an empty `sheet_path`, an unwritable `sheet_path`
+(`could not save <path>`), and files with more than one embedded tileset
+(`a sheet path with multiple embedded tilesets is not supported yet`).
+
 ## Parsing untrusted files
 
 Runtime loading is designed for untrusted input — mods, downloads,

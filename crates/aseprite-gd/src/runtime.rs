@@ -266,10 +266,45 @@ impl AseTilesetSync {
             godot_error!("AseTilesetSync.sync: tile_set is null");
             return 0;
         };
-        match convert::load_ase(&path).and_then(|f| convert::sync_tileset_into(&f, &mut tile_set)) {
+        match convert::load_ase(&path)
+            .and_then(|f| convert::sync_tileset_into(&f, &mut tile_set, None))
+        {
             Ok(n) => n as i64,
             Err(e) => {
                 godot_error!("AseTilesetSync.sync: {path}: {e}");
+                0
+            }
+        }
+    }
+
+    /// Like `sync`, but saves the atlas sheet as its own lossless texture
+    /// file at `sheet_path` (created there or updated in place) and
+    /// references it from the TileSet instead of embedding a copy. Point
+    /// `sheet_path` at an extraction's `sheet.res` and the TileSet shares
+    /// one texture with the extracted AtlasTextures. The sheet file is owned
+    /// by the sync; single embedded tileset only.
+    #[func]
+    fn sync_with_sheet(
+        tile_set: Option<Gd<godot::classes::TileSet>>,
+        path: GString,
+        sheet_path: GString,
+    ) -> i64 {
+        let Some(mut tile_set) = tile_set else {
+            godot_error!("AseTilesetSync.sync_with_sheet: tile_set is null");
+            return 0;
+        };
+        let sheet_path = sheet_path.to_string();
+        let sheet_path = sheet_path.trim();
+        if sheet_path.is_empty() {
+            godot_error!("AseTilesetSync.sync_with_sheet: sheet_path is empty");
+            return 0;
+        }
+        match convert::load_ase(&path)
+            .and_then(|f| convert::sync_tileset_into(&f, &mut tile_set, Some(sheet_path)))
+        {
+            Ok(n) => n as i64,
+            Err(e) => {
+                godot_error!("AseTilesetSync.sync_with_sheet: {path}: {e}");
                 0
             }
         }

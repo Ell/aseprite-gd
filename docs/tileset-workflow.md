@@ -43,6 +43,36 @@ ResourceSaver.save(tile_set, "res://world/tiles.tres")
 Re-run the sync whenever the art changes; wire it into a save hook or an
 EditorScript shortcut if you want it automatic.
 
+## One sheet on disk: sync_with_sheet
+
+`sync` embeds the atlas texture inside the saved `.tres`. That is fine when
+the TileSet is the only consumer, but if anything else needs the same pixels
+— most commonly `extract_dir` writing named AtlasTextures from the same file
+— each consumer would carry its own copy. `sync_with_sheet` saves the sheet
+as a standalone lossless texture file and references it instead:
+
+```gdscript
+AseTilesetSync.sync_with_sheet(tile_set, "res://art/terrain.aseprite",
+        "res://art/terrain.sheet.res")
+ResourceSaver.save(tile_set, "res://world/tiles.tres")
+```
+
+Point `sheet_path` at an extraction's `sheet.res` and the TileSet, the
+extracted AtlasTextures, and every scene using either all share one file on
+disk and one texture on the GPU (so they batch together). With no extraction
+in play, name it after the TileSet (`tiles.sheet.res` next to `tiles.tres`)
+so it is obvious what it belongs to.
+
+The sheet file is machine-owned: it is created on first sync and updated in
+place afterwards — same path, same UID — so references never go stale.
+Don't hand-edit it, and expect whatever sits at that path to be overwritten.
+Files with more than one embedded tileset are not supported with a sheet
+path (each source would need its own file); use `sync` there.
+
+Both layouts are the same fixed 16-column grid, so switching an existing
+TileSet from `sync` to `sync_with_sheet` (or back) changes where the pixels
+live, never the tile coordinates.
+
 ## Mixed tile sizes
 
 `TileSet.tile_size` (the grid cell) is a whole-TileSet property; each synced

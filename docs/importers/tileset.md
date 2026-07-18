@@ -21,7 +21,7 @@ imported resource — see below.
 | `include_hidden_layers` | `false` | Also render layers that are hidden in Aseprite. |
 | `exclude_tags` | `""` | Comma-separated, case-sensitive substrings; tags whose names contain any of them produce no animations. |
 | `post_import_script` | `""` | Path to a hook script whose `_post_import` runs on the built resource before it is saved — see [post-import-hooks.md](../post-import-hooks.md). |
-| `extract_dir` | `""` | When set, tiles whose user data carries a name are written to this folder as `<name>.tres` AtlasTextures sharing one `sheet.res` — a drag-and-drop palette that refreshes on reimport. The folder is owned by the import: stale files from renamed tiles are removed. |
+| `extract_dir` | `""` | When set, tiles whose user data carries a name are written to this folder as `<name>.tres` AtlasTextures sharing one `sheet.res` — a drag-and-drop palette that refreshes on reimport. The folder is owned by the import: stale files from renamed tiles are removed. A hook syncing the same file can pass that `sheet.res` to `AseTilesetSync.sync_with_sheet` so the synced TileSet shares the texture instead of embedding its own copy. |
 
 ## What maps to what
 

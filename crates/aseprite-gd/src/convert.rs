@@ -616,7 +616,16 @@ fn ensure_text_layer(tile_set: &mut Gd<TileSet>) -> i32 {
 /// Aseprite tileset id and created when missing; surviving tiles keep their
 /// TileData; tiles no longer in the file are removed. Returns the number of
 /// sources synced.
-pub fn sync_tileset_into(file: &AseFile, tile_set: &mut Gd<TileSet>) -> Result<u32, String> {
+/// With `sheet_path` set, the atlas texture is saved as its own lossless
+/// file there and referenced from the TileSet instead of embedded — point it
+/// at an extraction's `sheet.res` and both share one texture on disk and on
+/// the GPU. The file is owned by the sync (created or updated in place, UID
+/// preserved). Only supported for files with a single embedded tileset.
+pub fn sync_tileset_into(
+    file: &AseFile,
+    tile_set: &mut Gd<TileSet>,
+    sheet_path: Option<&str>,
+) -> Result<u32, String> {
     use godot::classes::{TileSetAtlasSource, TileSetSource};
 
     let has_text = file
@@ -648,7 +657,20 @@ pub fn sync_tileset_into(file: &AseFile, tile_set: &mut Gd<TileSet>) -> Result<u
                 .done();
             source
         };
-        source.set_texture(&texture);
+        match sheet_path {
+            Some(p) => {
+                if synced > 0 {
+                    return Err(
+                        "a sheet path with multiple embedded tilesets is not supported yet"
+                            .to_string(),
+                    );
+                }
+                let image = texture.get_image().ok_or("tileset sheet has no image")?;
+                let sheet = save_shared_sheet(&image, p)?;
+                source.set_texture(&sheet);
+            }
+            None => source.set_texture(&texture),
+        }
         source.set_texture_region_size(Vector2i::new(tw, th));
         // Shown in the TileSet panel's source list: "<name> (<id>)", with a
         // generic fallback for unnamed tilesets. Refreshed on every sync —
@@ -709,7 +731,7 @@ pub fn build_tileset(file: &AseFile) -> Result<Gd<TileSet>, String> {
         first.tile_width as i32,
         first.tile_height as i32,
     ));
-    sync_tileset_into(file, &mut tile_set)?;
+    sync_tileset_into(file, &mut tile_set, None)?;
     Ok(tile_set)
 }
 
@@ -1150,6 +1172,46 @@ pub fn build_sprite_frames_grid(
     Ok(frames)
 }
 
+/// Saves a standalone lossless sheet texture at `path`, updating the cached
+/// or on-disk resource in place when one exists so every consumer — synced
+/// TileSets, extracted AtlasTextures, open scenes — keeps pointing at one
+/// instance with a stable path and UID. The file is machine-owned:
+/// whatever sits at `path` is overwritten.
+fn save_shared_sheet(
+    image: &Gd<Image>,
+    path: &str,
+) -> Result<Gd<godot::classes::PortableCompressedTexture2D>, String> {
+    use godot::classes::portable_compressed_texture_2d::CompressionMode;
+    use godot::classes::{
+        DirAccess, FileAccess, PortableCompressedTexture2D, ResourceLoader, ResourceSaver,
+    };
+
+    let gpath = GString::from(path);
+    if let Some((dir, _)) = path.rsplit_once('/') {
+        DirAccess::make_dir_recursive_absolute(&GString::from(dir));
+    }
+    let existing = (ResourceLoader::singleton().has_cached(&gpath)
+        || FileAccess::file_exists(&gpath))
+    .then(|| ResourceLoader::singleton().load(&gpath))
+    .flatten()
+    .and_then(|r| r.try_cast::<PortableCompressedTexture2D>().ok());
+    let is_new = existing.is_none();
+    let mut sheet = existing.unwrap_or_else(PortableCompressedTexture2D::new_gd);
+    sheet.create_from_image(image, CompressionMode::LOSSLESS);
+    if ResourceSaver::singleton()
+        .save_ex(&sheet)
+        .path(&gpath)
+        .done()
+        != godot::global::Error::OK
+    {
+        return Err(format!("could not save {path}"));
+    }
+    if is_new {
+        sheet.take_over_path(&gpath);
+    }
+    Ok(sheet)
+}
+
 /// Writes an extraction folder: one standalone sheet plus one AtlasTexture
 /// file per named region, all sharing that sheet. The folder is owned by the
 /// extraction — stale `.tres`/`.res` files from removed or renamed regions
@@ -1159,23 +1221,10 @@ fn write_extraction(
     sheet_image: &Gd<Image>,
     entries: &[(String, Rect2)],
 ) -> Result<u32, String> {
-    use godot::classes::portable_compressed_texture_2d::CompressionMode;
-    use godot::classes::{DirAccess, PortableCompressedTexture2D, ResourceSaver};
+    use godot::classes::{DirAccess, ResourceSaver};
 
     let dir = dir.trim_end_matches('/');
-    DirAccess::make_dir_recursive_absolute(dir);
-
-    let mut sheet = PortableCompressedTexture2D::new_gd();
-    sheet.create_from_image(sheet_image, CompressionMode::LOSSLESS);
-    let sheet_path = format!("{dir}/sheet.res");
-    let err = ResourceSaver::singleton()
-        .save_ex(&sheet)
-        .path(&GString::from(sheet_path.as_str()))
-        .done();
-    if err != godot::global::Error::OK {
-        return Err(format!("could not save {sheet_path}"));
-    }
-    sheet.take_over_path(&GString::from(sheet_path.as_str()));
+    let sheet = save_shared_sheet(sheet_image, &format!("{dir}/sheet.res"))?;
 
     let mut wanted: Vec<String> = vec!["sheet.res".to_string()];
     let mut written = 0;

@@ -58,7 +58,10 @@ for tiles (use the bundled `name_tiles.lua` Aseprite dialog) — and set
 `extract_dir` on the texture or TileSet import. The folder fills with
 `sword.tres`, `potion.tres`, ... AtlasTextures sharing one sheet: drag them
 into any texture slot, and they refresh when the art changes. One GPU
-texture behind all of them, so drawing several batches cleanly.
+texture behind all of them, so drawing several batches cleanly. If a hook on
+the same file also syncs a TileSet, `AseTilesetSync.sync_with_sheet` pointed
+at the extraction's `sheet.res` makes the tilemap share that texture too
+(see [tileset-workflow.md](tileset-workflow.md)).
 
 ## Multi-layer characters (outfits, equipment)
 
@@ -100,17 +103,21 @@ so a mixed file (character layers plus a tilemap layer) can feed both:
 extends RefCounted
 
 const TILESET_PATH := "res://world/tiles.tres"
+const SHEET_PATH := "res://world/tiles.sheet.res"
 
 func _post_import(resource: Resource, _doc: AseDocument,
         _options: Dictionary, source_file: String) -> Resource:
     var ts: TileSet = load(TILESET_PATH) if ResourceLoader.exists(TILESET_PATH) else TileSet.new()
-    if AseTilesetSync.sync(ts, source_file) > 0:
+    if AseTilesetSync.sync_with_sheet(ts, source_file, SHEET_PATH) > 0:
         ResourceSaver.save(ts, TILESET_PATH)
     return resource
 ```
 
 Collision and terrain authored on that TileSet survive, per the usual sync
-guarantees.
+guarantees. `sync_with_sheet` keeps the sheet in its own file instead of
+embedding it in the `.tres`; if the import also uses `extract_dir`, pass
+`options["extract_dir"].path_join("sheet.res")` as the sheet path and the
+TileSet shares one texture with the extracted AtlasTextures.
 
 ## 9-patch UI panels
 

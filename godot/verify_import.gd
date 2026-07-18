@@ -129,6 +129,21 @@ func _init():
             and td1.get_custom_data("aseprite_text") == "solid"
         print("tileset_sync: polygons=", td1.get_collision_polygons_count(0), " text=", td1.get_custom_data("aseprite_text"), " ok=", sync_ok)
 
+    # Externalized sheet: sync_with_sheet writes the atlas texture as its own
+    # file and references it; a second sync updates that resource in place
+    # (same instance, same path) rather than minting a new one.
+    var shared := TileSet.new()
+    var shsheet_ok = false
+    if AseTilesetSync.sync_with_sheet(shared, "res://sprites/tile_flips.aseprite", "user://shared_sheet.res") == 1:
+        var ssrc: TileSetAtlasSource = shared.get_source(shared.get_source_id(0))
+        var stex = ssrc.texture
+        AseTilesetSync.sync_with_sheet(shared, "res://sprites/tile_flips.aseprite", "user://shared_sheet.res")
+        shsheet_ok = stex is PortableCompressedTexture2D \
+            and stex.resource_path == "user://shared_sheet.res" \
+            and shared.get_source(shared.get_source_id(0)).texture == stex \
+            and FileAccess.file_exists("user://shared_sheet.res")
+        print("shared_sheet: path=", stex.resource_path if stex else null, " ok=", shsheet_ok)
+
     # Slice hitbox tracks: "<slice>:position"/":size" value tracks (opt-in).
     var slib = load("res://sprites/slices_anim.aseprite")
     var strk_ok = false
@@ -187,6 +202,13 @@ func _init():
     var dual_ts = load("res://dual_tiles.tres")
     var dual_ok = dual_sf is SpriteFrames and dual_ts is TileSet \
         and dual_ts.get_source_count() == 1 and dual_ts.get_source(0).get_tiles_count() > 0
+    if dual_ok:
+        # hook uses sync_with_sheet: the sheet must live in its own file,
+        # referenced from the .tres rather than embedded in it
+        var dtex = dual_ts.get_source(dual_ts.get_source_id(0)).texture
+        dual_ok = dtex is PortableCompressedTexture2D \
+            and dtex.resource_path == "res://dual_tiles.sheet.res" \
+            and FileAccess.get_file_as_string("res://dual_tiles.tres").contains("dual_tiles.sheet.res")
     print("dual_output: ok=", dual_ok)
 
     # Split-by-layer: one animation per visible leaf layer, isolated pixels.
@@ -221,7 +243,7 @@ func _init():
         hroot.free()
 
 
-    var ok = tex is Texture2D and sf is SpriteFrames and sf.get_animation_names().size() == 3 and doc_ok and atlas_ok and lib_ok and tset_ok and sb_ok and custom_ok and rt_ok and ct_ok and slices_ok and sync_ok and strk_ok and hooks_ok and split_ok and opts_ok and dual_ok and grid_ok and ganim_ok and extract_ok
+    var ok = tex is Texture2D and sf is SpriteFrames and sf.get_animation_names().size() == 3 and doc_ok and atlas_ok and lib_ok and tset_ok and sb_ok and custom_ok and rt_ok and ct_ok and slices_ok and sync_ok and shsheet_ok and strk_ok and hooks_ok and split_ok and opts_ok and dual_ok and grid_ok and ganim_ok and extract_ok
     # Non-destructive AnimationPlayer merge: hand-made tracks and animations
     # survive re-import; imported tracks update without duplicating.
     var player := AnimationPlayer.new()

@@ -3,5 +3,6 @@ godot/.godot/
 *.import
 !godot/sprites/*.import
 godot/dual_tiles.tres
+godot/dual_tiles.sheet.res
 godot/extracted_tiles/
 godot/extracted_slices/
