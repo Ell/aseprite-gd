@@ -69,6 +69,8 @@ impl IEditorImportPlugin for AseTilesetImporter {
         let mut extract = VarDictionary::new();
         extract.set(&"name".to_variant(), &"extract_dir".to_variant());
         extract.set(&"default_value".to_variant(), &"".to_variant());
+        // 14 = PROPERTY_HINT_DIR: folder picker in the Import dock
+        extract.set(&"property_hint".to_variant(), &14i64.to_variant());
         opts.push(extract.upcast_any_dictionary());
         opts
     }
