@@ -73,6 +73,10 @@ impl IEditorImportPlugin for AseTextureImporter {
         slice.set(&"name".to_variant(), &"slice".to_variant());
         slice.set(&"default_value".to_variant(), &"".to_variant());
         opts.push(slice.upcast_any_dictionary());
+        let mut extract = VarDictionary::new();
+        extract.set(&"name".to_variant(), &"extract_dir".to_variant());
+        extract.set(&"default_value".to_variant(), &"".to_variant());
+        opts.push(extract.upcast_any_dictionary());
         opts.push(import::option_pair("scale", 1i64));
         opts.push(import::enum_option(
             "compress_mode",
@@ -108,6 +112,22 @@ impl IEditorImportPlugin for AseTextureImporter {
             .get(&"slice".to_variant())
             .map(|v| v.to_string())
             .unwrap_or_default();
+        let extract_dir = options
+            .get(&"extract_dir".to_variant())
+            .map(|v| v.to_string())
+            .unwrap_or_default();
+        if !extract_dir.trim().is_empty() {
+            let scale_opt = options
+                .get(&"scale".to_variant())
+                .map(|v| v.to::<i64>().clamp(1, 8) as u32)
+                .unwrap_or(1);
+            if let Err(e) =
+                convert::extract_named_slices(&file, extract_dir.trim(), frame, scale_opt)
+            {
+                godot_error!("aseprite-gd: {source_file}: {e}");
+                return Error::ERR_CANT_CREATE;
+            }
+        }
         let mut image = match if slice.trim().is_empty() {
             convert::frame_to_image(&file, frame)
         } else {

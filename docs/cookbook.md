@@ -40,14 +40,25 @@ var sheet: SpriteFrames = load("res://characters.aseprite")
 var hero: Texture2D = sheet.get_frame_texture("default", 9) # row-major index
 ```
 
-On a multi-frame file, `split_grid` instead produces one animation per cell
-playing that cell across the frames — the layout where each tile of the
-canvas is its own animation set (e.g. walk-down / walk-side / walk-up
-stacked vertically). Animations are named by cell index, row-major.
+On a multi-frame file, `split_grid` produces one animation per cell playing
+that cell across the frames (each canvas tile is its own animation set,
+e.g. walk-down / walk-side / walk-up stacked vertically). Add tags and the
+combination becomes `<tag>_<cell>` animation sets — directions in the grid,
+actions as tags, loop behavior from each tag's repeat — which fits a whole
+character in one file.
 
 Cells share one trimmed atlas, so blank and duplicate cells are free. Sheets
 whose regions are not a uniform grid should use slices instead (see the
 runtime API's `get_slices`).
+
+## Named sprites out of one file (items, icons)
+
+Name regions in the art — slices for irregular shapes, or per-tile user data
+for tiles (use the bundled `name_tiles.lua` Aseprite dialog) — and set
+`extract_dir` on the texture or TileSet import. The folder fills with
+`sword.tres`, `potion.tres`, ... AtlasTextures sharing one sheet: drag them
+into any texture slot, and they refresh when the art changes. One GPU
+texture behind all of them, so drawing several batches cleanly.
 
 ## Multi-layer characters (outfits, equipment)
 

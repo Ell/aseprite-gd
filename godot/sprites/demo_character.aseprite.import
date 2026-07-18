@@ -18,5 +18,6 @@ include_hidden_layers=false
 post_import_script=""
 frame=0
 slice=""
+extract_dir=""
 scale=1
 compress_mode=0

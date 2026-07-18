@@ -62,6 +62,9 @@ jobs:
           DEST=dist/addons/aseprite_gd
           mkdir -p "$DEST/bin"
           cp godot/addons/aseprite_gd/plugin.cfg godot/addons/aseprite_gd/plugin.gd "$DEST/"
+          cp godot/addons/aseprite_gd/import_section.gd godot/addons/aseprite_gd/inspector_plugin.gd "$DEST/"
+          mkdir -p "$DEST/aseprite_scripts"
+          cp tools/aseprite/name_tiles.lua "$DEST/aseprite_scripts/"
           cp libs/* "$DEST/bin/"
           cp LICENSE README.md "$DEST/"
           # Distribution .gdextension: libraries live inside the addon.
@@ -103,6 +106,9 @@ jobs:
           DEST=assetlib-tree/addons/aseprite_gd
           mkdir -p "$DEST/bin"
           cp godot/addons/aseprite_gd/plugin.cfg godot/addons/aseprite_gd/plugin.gd "$DEST/"
+          cp godot/addons/aseprite_gd/import_section.gd godot/addons/aseprite_gd/inspector_plugin.gd "$DEST/"
+          mkdir -p "$DEST/aseprite_scripts"
+          cp tools/aseprite/name_tiles.lua "$DEST/aseprite_scripts/"
           cp libs/* "$DEST/bin/"
           cp LICENSE README.md "$DEST/"
           cat > "$DEST/aseprite_gd.gdextension" <<'GDEXT'

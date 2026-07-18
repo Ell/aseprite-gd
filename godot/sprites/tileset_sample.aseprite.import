@@ -16,3 +16,4 @@ exclude_layers=""
 exclude_tags=""
 include_hidden_layers=false
 post_import_script=""
+extract_dir=""

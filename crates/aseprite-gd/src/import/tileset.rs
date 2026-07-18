@@ -65,7 +65,12 @@ impl IEditorImportPlugin for AseTilesetImporter {
     }
 
     fn get_import_options(&self, _path: GString, _preset_index: i32) -> Array<AnyDictionary> {
-        import::common_options()
+        let mut opts = import::common_options();
+        let mut extract = VarDictionary::new();
+        extract.set(&"name".to_variant(), &"extract_dir".to_variant());
+        extract.set(&"default_value".to_variant(), &"".to_variant());
+        opts.push(extract.upcast_any_dictionary());
+        opts
     }
 
     fn import(
@@ -85,6 +90,16 @@ impl IEditorImportPlugin for AseTilesetImporter {
         };
         let file = ConvertOptions::from_dict(&options).apply(&file);
 
+        let extract_dir = options
+            .get(&"extract_dir".to_variant())
+            .map(|v| v.to_string())
+            .unwrap_or_default();
+        if !extract_dir.trim().is_empty()
+            && let Err(e) = convert::extract_named_tiles(&file, extract_dir.trim())
+        {
+            godot_error!("aseprite-gd: {source_file}: {e}");
+            return Error::ERR_CANT_CREATE;
+        }
         let library = match convert::build_tileset(&file) {
             Ok(l) => l,
             Err(e) => {

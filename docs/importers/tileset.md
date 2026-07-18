@@ -21,6 +21,7 @@ imported resource — see below.
 | `include_hidden_layers` | `false` | Also render layers that are hidden in Aseprite. |
 | `exclude_tags` | `""` | Comma-separated, case-sensitive substrings; tags whose names contain any of them produce no animations. |
 | `post_import_script` | `""` | Path to a hook script whose `_post_import` runs on the built resource before it is saved — see [post-import-hooks.md](../post-import-hooks.md). |
+| `extract_dir` | `""` | When set, tiles whose user data carries a name are written to this folder as `<name>.tres` AtlasTextures sharing one `sheet.res` — a drag-and-drop palette that refreshes on reimport. The folder is owned by the import: stale files from renamed tiles are removed. |
 
 ## What maps to what
 
@@ -88,3 +89,7 @@ you own.
 Each atlas source is named "<tileset name> (<id>)" in the TileSet panel
 ("Tileset (<id>)" when unnamed in Aseprite); the name refreshes from the
 file on every import or sync.
+
+Names are authored in Aseprite with the bundled tile-naming dialog
+(`aseprite_scripts/name_tiles.lua` in the addon; see
+[tileset-workflow.md](../tileset-workflow.md)).

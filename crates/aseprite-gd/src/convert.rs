@@ -1118,25 +1118,202 @@ pub fn build_sprite_frames_grid(
         }
     } else {
         // Animated sheet: each cell is an animation set across the frames.
-        for c in 0..per_frame {
-            let name = StringName::from(c.to_string().as_str());
-            frames.add_animation(&name);
-            frames.set_animation_speed(&name, 1000.0);
-            frames.set_animation_loop(&name, true);
-            for f in 0..file.frames.len() {
-                frames
-                    .add_frame_ex(
-                        &name,
-                        &cell_texture(f * per_frame + c)
-                            .clone()
-                            .upcast::<Texture2D>(),
-                    )
-                    .duration(file.frames[f].duration_ms as f32)
-                    .done();
+        // With tags, cells x tags combine into "<tag>_<cell>" animations
+        // (directions in the grid, actions as tags) honoring tag order,
+        // direction, and looping; without tags, cells become "<cell>" across
+        // all frames.
+        for anim_def in animations(file) {
+            for c in 0..per_frame {
+                let name = if file.tags.is_empty() {
+                    c.to_string()
+                } else {
+                    format!("{}_{c}", anim_def.name)
+                };
+                let name = StringName::from(name.as_str());
+                frames.add_animation(&name);
+                frames.set_animation_speed(&name, 1000.0);
+                frames.set_animation_loop(&name, anim_def.looped);
+                for &f in &anim_def.order {
+                    frames
+                        .add_frame_ex(
+                            &name,
+                            &cell_texture(f * per_frame + c)
+                                .clone()
+                                .upcast::<Texture2D>(),
+                        )
+                        .duration(file.frames[f].duration_ms as f32)
+                        .done();
+                }
             }
         }
     }
     Ok(frames)
+}
+
+/// Writes an extraction folder: one standalone sheet plus one AtlasTexture
+/// file per named region, all sharing that sheet. The folder is owned by the
+/// extraction — stale `.tres`/`.res` files from removed or renamed regions
+/// are deleted on the next run.
+fn write_extraction(
+    dir: &str,
+    sheet_image: &Gd<Image>,
+    entries: &[(String, Rect2)],
+) -> Result<u32, String> {
+    use godot::classes::portable_compressed_texture_2d::CompressionMode;
+    use godot::classes::{DirAccess, PortableCompressedTexture2D, ResourceSaver};
+
+    let dir = dir.trim_end_matches('/');
+    DirAccess::make_dir_recursive_absolute(dir);
+
+    let mut sheet = PortableCompressedTexture2D::new_gd();
+    sheet.create_from_image(sheet_image, CompressionMode::LOSSLESS);
+    let sheet_path = format!("{dir}/sheet.res");
+    let err = ResourceSaver::singleton()
+        .save_ex(&sheet)
+        .path(&GString::from(sheet_path.as_str()))
+        .done();
+    if err != godot::global::Error::OK {
+        return Err(format!("could not save {sheet_path}"));
+    }
+    sheet.take_over_path(&GString::from(sheet_path.as_str()));
+
+    let mut wanted: Vec<String> = vec!["sheet.res".to_string()];
+    let mut written = 0;
+    for (name, region) in entries {
+        let safe: String = name
+            .chars()
+            .map(|c| {
+                if c.is_alphanumeric() || c == '-' || c == '_' {
+                    c
+                } else {
+                    '_'
+                }
+            })
+            .collect();
+        if safe.is_empty() {
+            continue;
+        }
+        let mut tex = AtlasTexture::new_gd();
+        tex.set_atlas(&sheet.clone().upcast::<Texture2D>());
+        tex.set_region(*region);
+        let file_name = format!("{safe}.tres");
+        let path = format!("{dir}/{file_name}");
+        if ResourceSaver::singleton()
+            .save_ex(&tex)
+            .path(&GString::from(path.as_str()))
+            .done()
+            != godot::global::Error::OK
+        {
+            return Err(format!("could not save {path}"));
+        }
+        if wanted.contains(&file_name) {
+            godot_warn!("aseprite-gd: duplicate extracted name {name:?}; last one wins");
+        } else {
+            wanted.push(file_name);
+        }
+        written += 1;
+    }
+
+    // The folder is ours: drop leftovers from renamed/removed regions.
+    if let Some(da) = DirAccess::open(&GString::from(dir)) {
+        let mut da = da;
+        for f in da.get_files().as_slice() {
+            let f = f.to_string();
+            if (f.ends_with(".tres") || f.ends_with(".res")) && !wanted.contains(&f) {
+                da.remove(&GString::from(f.as_str()));
+            }
+        }
+    }
+
+    Ok(written)
+}
+
+/// Extracts tiles carrying user-data text as named AtlasTextures sharing one
+/// sheet (see docs: the tile-naming script authors the names in Aseprite).
+pub fn extract_named_tiles(file: &AseFile, dir: &str) -> Result<u32, String> {
+    let mut entries: Vec<(String, Rect2)> = Vec::new();
+    let mut sheet_img: Option<Gd<Image>> = None;
+
+    for ts in &file.tilesets {
+        let Some((texture, count, start)) = tileset_sheet(file, ts)? else {
+            continue;
+        };
+        let named: Vec<(String, Rect2)> = (0..count)
+            .filter_map(|i| {
+                let name = ts.tile_user_data.get(start + i)?.text.clone()?;
+                let c = tile_coords(i);
+                Some((
+                    name,
+                    Rect2::new(
+                        Vector2::new(
+                            (c.x * ts.tile_width as i32) as f32,
+                            (c.y * ts.tile_height as i32) as f32,
+                        ),
+                        Vector2::new(ts.tile_width as f32, ts.tile_height as f32),
+                    ),
+                ))
+            })
+            .collect();
+        if named.is_empty() {
+            continue;
+        }
+        if sheet_img.is_some() {
+            return Err(
+                "extract_dir with multiple tilesets carrying named tiles is not supported yet"
+                    .to_string(),
+            );
+        }
+        sheet_img = texture.get_image();
+        entries = named;
+    }
+
+    let Some(img) = sheet_img else {
+        return Ok(0); // nothing named — not an error
+    };
+    write_extraction(dir, &img, &entries)
+}
+
+/// Extracts named slices as AtlasTextures sharing one composited-frame
+/// sheet. The scale factor applies to both the sheet and the regions.
+pub fn extract_named_slices(
+    file: &AseFile,
+    dir: &str,
+    frame: usize,
+    scale: u32,
+) -> Result<u32, String> {
+    let entries: Vec<(String, Rect2)> = file
+        .slices
+        .iter()
+        .filter_map(|s| {
+            let key = s.key_for(frame as u32)?;
+            if key.width == 0 || key.height == 0 || s.name.is_empty() {
+                return None;
+            }
+            let k = scale as f32;
+            Some((
+                s.name.clone(),
+                Rect2::new(
+                    Vector2::new(key.x as f32 * k, key.y as f32 * k),
+                    Vector2::new(key.width as f32 * k, key.height as f32 * k),
+                ),
+            ))
+        })
+        .collect();
+    if entries.is_empty() {
+        return Ok(0);
+    }
+    let rendered = render_frame(file, frame).map_err(|e| e.to_string())?;
+    let scaled = scale_rgba(&rendered, scale);
+    let data = PackedByteArray::from(scaled.pixels.as_slice());
+    let img = Image::create_from_data(
+        scaled.width as i32,
+        scaled.height as i32,
+        false,
+        Format::RGBA8,
+        &data,
+    )
+    .ok_or("extraction Image::create_from_data failed")?;
+    write_extraction(dir, &img, &entries)
 }
 
 #[cfg(test)]

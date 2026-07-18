@@ -33,7 +33,7 @@ Set user data via right-click → Properties on the object.
 |---|---|
 | A cel (text) | AnimationLibrary: a Call Method track keys that method name at the frame's start |
 | A tag | Available to scripts via `AseDocument` |
-| A tile (text) | `aseprite_text` custom data layer on imported/synced TileSets |
+| A tile (text) | `aseprite_text` custom data layer on imported/synced TileSets; with `extract_dir`, also a named AtlasTexture file. Author with the bundled `name_tiles.lua` dialog (Aseprite has no UI for this). |
 | A slice (text) | `text` key in `AseDocument.get_slices()` entries |
 | The sprite (text/color) | `AseDocument.get_user_data()` |
 
@@ -45,6 +45,7 @@ Set user data via right-click → Properties on the object.
 | Slice pivot | `pivot` key in `AseDocument.get_slices()` entries |
 | Slice moved/resized per frame (slice keys) | Animated `<slice name>:position` / `:size` tracks (AnimationLibrary with `slice_tracks` on) |
 | Slice bounds | `rect` key in `AseDocument.get_slices()` entries |
+| Slice names | With `extract_dir` on a texture import, each named slice becomes an AtlasTexture file |
 
 ## Tilemaps
 

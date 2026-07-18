@@ -17,6 +17,7 @@ exclude_tags=""
 include_hidden_layers=false
 post_import_script=""
 split_layers=true
+split_grid=""
 atlas_padding=1
 atlas_extrude=false
 scale=1

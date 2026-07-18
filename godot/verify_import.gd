@@ -159,15 +159,27 @@ func _init():
             and c0 is AtlasTexture and c0.get_size() == Vector2(8, 8)
         print("grid_split: cells=", gsheet.get_frame_count("default"), " cell0=", c0.get_size(), " ok=", grid_ok)
 
-    # Grid split on a multi-frame file: one animation per cell across frames.
+    # Grid split x tags: "<tag>_<cell>" animation sets (grid = directions,
+    # tags = actions), honoring ping-pong order and per-tag looping.
     var ganim = load("res://sprites/grid_anim.aseprite")
     var ganim_ok = false
     if ganim is SpriteFrames:
         var names2 = ganim.get_animation_names()
-        ganim_ok = names2.size() == 4 and ganim.has_animation("0") \
-            and ganim.get_frame_count("0") == 8 \
-            and ganim.get_frame_duration("0", 0) == 200.0
-        print("grid_anim: anims=", names2.size(), " frames=", ganim.get_frame_count("0"), " ok=", ganim_ok)
+        ganim_ok = names2.size() == 12 and ganim.has_animation("walk_0") \
+            and ganim.get_frame_count("walk_0") == 6 \
+            and ganim.get_animation_loop("walk_0") \
+            and not ganim.get_animation_loop("blink_3") \
+            and ganim.get_frame_duration("idle_0", 0) == 200.0
+        print("grid_anim: anims=", names2.size(), " walk_0=", ganim.get_frame_count("walk_0"), " ok=", ganim_ok)
+
+    # Named-region extraction: owned folders of AtlasTextures + shared sheet.
+    var ex_tile = load("res://extracted_tiles/solid.tres")
+    var ex_slice = load("res://extracted_slices/panel.tres")
+    var extract_ok = ex_tile is AtlasTexture and ex_tile.get_size() == Vector2(8, 8) \
+        and ex_tile.atlas != null \
+        and ex_slice is AtlasTexture and ex_slice.get_size() == Vector2(48, 32) \
+        and ResourceLoader.exists("res://extracted_slices/hitbox.tres")
+    print("extraction: tile=", ex_tile.get_size() if ex_tile else null, " slice=", ex_slice.get_size() if ex_slice else null, " ok=", extract_ok)
 
     # Dual output: one file imports as SpriteFrames while a hook syncs its
     # tilesets into a TileSet resource on every reimport.
@@ -209,7 +221,7 @@ func _init():
         hroot.free()
 
 
-    var ok = tex is Texture2D and sf is SpriteFrames and sf.get_animation_names().size() == 3 and doc_ok and atlas_ok and lib_ok and tset_ok and sb_ok and custom_ok and rt_ok and ct_ok and slices_ok and sync_ok and strk_ok and hooks_ok and split_ok and opts_ok and dual_ok and grid_ok and ganim_ok
+    var ok = tex is Texture2D and sf is SpriteFrames and sf.get_animation_names().size() == 3 and doc_ok and atlas_ok and lib_ok and tset_ok and sb_ok and custom_ok and rt_ok and ct_ok and slices_ok and sync_ok and strk_ok and hooks_ok and split_ok and opts_ok and dual_ok and grid_ok and ganim_ok and extract_ok
     # Non-destructive AnimationPlayer merge: hand-made tracks and animations
     # survive re-import; imported tracks update without duplicating.
     var player := AnimationPlayer.new()
