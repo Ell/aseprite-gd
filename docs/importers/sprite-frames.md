@@ -27,6 +27,7 @@ timings, and all frames share one trimmed, deduplicated atlas.
 | `compress_mode` | `Lossless` | Texture storage: embedded lossless, PortableCompressedTexture2D lossless, or lossy. |
 | `snap_to_fps` | `0` | When above 0, re-time frame durations to this frame rate's tick grid (exact milliseconds otherwise). |
 | `split_layers` | `false` | One animation per visible leaf layer per tag, named `<layer>/<tag>`, all sharing one atlas. Stack one AnimatedSprite2D per layer and play the same tag on each for multi-layer characters. |
+| `split_grid` | `""` | "WxH" (e.g. "16x16"): chop each frame's canvas into cells, row-major, partial edge cells dropped. A single-frame sheet becomes one `default` animation indexable by cell; multi-frame files get one animation per frame. |
 
 ## What maps to what
 

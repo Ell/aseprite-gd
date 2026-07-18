@@ -70,6 +70,10 @@ impl IEditorImportPlugin for AseSpriteFramesImporter {
         split.set(&"name".to_variant(), &"split_layers".to_variant());
         split.set(&"default_value".to_variant(), &false.to_variant());
         opts.push(split.upcast_any_dictionary());
+        let mut grid = VarDictionary::new();
+        grid.set(&"name".to_variant(), &"split_grid".to_variant());
+        grid.set(&"default_value".to_variant(), &"".to_variant());
+        opts.push(grid.upcast_any_dictionary());
         let mut pad = VarDictionary::new();
         pad.set(&"name".to_variant(), &"atlas_padding".to_variant());
         pad.set(&"default_value".to_variant(), &1.to_variant());
@@ -109,7 +113,26 @@ impl IEditorImportPlugin for AseSpriteFramesImporter {
             .get(&"split_layers".to_variant())
             .map(|v| v.booleanize())
             .unwrap_or(false);
-        let frames = match if split_layers {
+        // "WxH" (e.g. "16x16") chops each frame's canvas into cells.
+        let split_grid = options
+            .get(&"split_grid".to_variant())
+            .map(|v| v.to_string())
+            .unwrap_or_default();
+        let grid_cells = split_grid.trim().split_once(['x', 'X']).and_then(|(w, h)| {
+            Some((w.trim().parse::<u32>().ok()?, h.trim().parse::<u32>().ok()?))
+        });
+        if !split_grid.trim().is_empty() && grid_cells.is_none() {
+            godot_error!("aseprite-gd: {source_file}: split_grid must look like \"16x16\"");
+            return Error::ERR_INVALID_PARAMETER;
+        }
+        let frames = match if let Some((cw, ch)) = grid_cells {
+            convert::build_sprite_frames_grid(
+                &file,
+                convert::AtlasParams::from_dict(&options),
+                cw,
+                ch,
+            )
+        } else if split_layers {
             convert::build_sprite_frames_split(&file, convert::AtlasParams::from_dict(&options))
         } else {
             convert::build_sprite_frames(&file, convert::AtlasParams::from_dict(&options))

@@ -1075,3 +1075,113 @@ mod tests {
         assert!(none.layers.iter().all(|l| l.is_visible()));
     }
 }
+
+/// Grid-split SpriteFrames for sheet files: each source frame's canvas is
+/// chopped into `cell_w` x `cell_h` cells (row-major, partial edge cells
+/// dropped), and every cell becomes a frame in the output. One source frame
+/// yields a single "default" animation indexable by cell; multi-frame files
+/// get one animation per source frame, named by frame index. Cells share the
+/// packed atlas, so blank and duplicate cells cost nothing.
+pub fn build_sprite_frames_grid(
+    file: &AseFile,
+    atlas_params: AtlasParams,
+    cell_w: u32,
+    cell_h: u32,
+) -> Result<Gd<SpriteFrames>, String> {
+    if cell_w == 0 || cell_h == 0 {
+        return Err("split_grid cells must be at least 1x1".to_string());
+    }
+    let cols = (file.header.width as u32 / cell_w) as usize;
+    let rows = (file.header.height as u32 / cell_h) as usize;
+    if cols == 0 || rows == 0 {
+        return Err(format!(
+            "split_grid {cell_w}x{cell_h} is larger than the {}x{} canvas",
+            file.header.width, file.header.height
+        ));
+    }
+
+    // Chop every rendered frame into scaled cells.
+    let mut cells: Vec<ase_core::composite::RgbaImage> = Vec::new();
+    for f in 0..file.frames.len() {
+        let rendered = render_frame(file, f).map_err(|e| e.to_string())?;
+        let canvas_w = rendered.width as usize;
+        for cy in 0..rows {
+            for cx in 0..cols {
+                let (w, h) = (cell_w as usize, cell_h as usize);
+                let (x0, y0) = (cx * w, cy * h);
+                let mut pixels = Vec::with_capacity(w * h * 4);
+                for y in y0..y0 + h {
+                    pixels.extend_from_slice(&rendered.pixels[(y * canvas_w + x0) * 4..][..w * 4]);
+                }
+                let cell = ase_core::composite::RgbaImage {
+                    width: cell_w,
+                    height: cell_h,
+                    pixels,
+                };
+                cells.push(scale_rgba(&cell, atlas_params.scale));
+            }
+        }
+    }
+
+    let atlas = crate::atlas::pack(&cells, atlas_params.padding, 16384, atlas_params.extrude);
+    let sheets: Vec<Gd<Texture2D>> = atlas
+        .pages
+        .iter()
+        .map(|page| {
+            let data = PackedByteArray::from(page.pixels.as_slice());
+            let image = Image::create_from_data(
+                page.width as i32,
+                page.height as i32,
+                false,
+                Format::RGBA8,
+                &data,
+            )
+            .ok_or("atlas Image::create_from_data failed")?;
+            make_texture(&image, atlas_params.compress)
+        })
+        .collect::<Result<_, _>>()?;
+
+    let k = atlas_params.scale as f32;
+    let (cw, ch) = (cell_w as f32 * k, cell_h as f32 * k);
+    let cell_texture = |i: usize| {
+        let p = &atlas.placements[atlas.frame_to_placement[i]];
+        let mut tex = AtlasTexture::new_gd();
+        tex.set_atlas(&sheets[p.page]);
+        tex.set_region(Rect2::new(
+            Vector2::new(p.x as f32, p.y as f32),
+            Vector2::new(p.width as f32, p.height as f32),
+        ));
+        tex.set_margin(Rect2::new(
+            Vector2::new(p.offset_x as f32, p.offset_y as f32),
+            Vector2::new(cw - p.width as f32, ch - p.height as f32),
+        ));
+        tex
+    };
+
+    let mut frames = SpriteFrames::new_gd();
+    frames.remove_animation(&StringName::from("default"));
+    let per_frame = cols * rows;
+    for f in 0..file.frames.len() {
+        let name = if file.frames.len() == 1 {
+            "default".to_string()
+        } else {
+            f.to_string()
+        };
+        let name = StringName::from(name.as_str());
+        frames.add_animation(&name);
+        frames.set_animation_speed(&name, 1000.0);
+        frames.set_animation_loop(&name, true);
+        for c in 0..per_frame {
+            frames
+                .add_frame_ex(
+                    &name,
+                    &cell_texture(f * per_frame + c)
+                        .clone()
+                        .upcast::<Texture2D>(),
+                )
+                .duration(file.frames[f].duration_ms as f32)
+                .done();
+        }
+    }
+    Ok(frames)
+}

@@ -29,6 +29,21 @@ nodes named after your slices. Each animation then keys
 `<slice name>:position` and `<slice name>:size` from the slice's per-frame
 keys — draw your hurtboxes in Aseprite, move them per frame, done.
 
+## Sprite sheets (grid of individual sprites)
+
+For a sheet that is one big image (an asset-pack grid rather than Aseprite
+frames), set the SpriteFrames importer's `split_grid` option to the cell
+size, e.g. `16x16`. Every cell becomes an indexable frame:
+
+```gdscript
+var sheet: SpriteFrames = load("res://characters.aseprite")
+var hero: Texture2D = sheet.get_frame_texture("default", 9) # row-major index
+```
+
+Cells share one trimmed atlas, so blank and duplicate cells are free. Sheets
+whose regions are not a uniform grid should use slices instead (see the
+runtime API's `get_slices`).
+
 ## Multi-layer characters (outfits, equipment)
 
 Enable `split_layers` on the SpriteFrames import: each visible layer becomes
