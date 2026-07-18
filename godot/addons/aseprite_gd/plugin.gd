@@ -7,6 +7,7 @@ extends EditorPlugin
 
 var _importers: Array = []
 var _inspector: EditorInspectorPlugin
+var _preview_gen: EditorResourcePreviewGenerator
 
 
 func _enter_tree() -> void:
@@ -20,11 +21,15 @@ func _enter_tree() -> void:
 
     _inspector = preload("res://addons/aseprite_gd/inspector_plugin.gd").new()
     add_inspector_plugin(_inspector)
+    _preview_gen = preload("res://addons/aseprite_gd/preview_generator.gd").new()
+    EditorInterface.get_resource_previewer().add_preview_generator(_preview_gen)
     add_tool_menu_item("aseprite-gd: Reimport all Aseprite files", _reimport_all)
 
 
 func _exit_tree() -> void:
     remove_tool_menu_item("aseprite-gd: Reimport all Aseprite files")
+    if _preview_gen != null:
+        EditorInterface.get_resource_previewer().remove_preview_generator(_preview_gen)
     if _inspector != null:
         remove_inspector_plugin(_inspector)
     for importer in _importers:

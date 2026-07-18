@@ -1,6 +1,15 @@
 # Editor tools
 
-Beyond the importers, the plugin adds two pieces of editor UI.
+Beyond the importers, the plugin adds these pieces of editor UI.
+
+## FileSystem thumbnails
+
+Every `.aseprite`/`.ase` file shows its composited first frame as its
+thumbnail in the FileSystem dock and file dialogs (grid display mode),
+whatever importer it uses. Godot only previews files whose imported product
+is a texture; the plugin's generator covers the rest — SpriteFrames,
+TileSet, AnimationLibrary, StyleBoxTexture, CanvasTexture, and scene
+imports. Thumbnails refresh when the file changes, like any other preview.
 
 ## Inspector import section
 

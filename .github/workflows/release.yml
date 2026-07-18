@@ -62,7 +62,7 @@ jobs:
           DEST=dist/addons/aseprite_gd
           mkdir -p "$DEST/bin"
           cp godot/addons/aseprite_gd/plugin.cfg godot/addons/aseprite_gd/plugin.gd "$DEST/"
-          cp godot/addons/aseprite_gd/import_section.gd godot/addons/aseprite_gd/inspector_plugin.gd "$DEST/"
+          cp godot/addons/aseprite_gd/import_section.gd godot/addons/aseprite_gd/inspector_plugin.gd godot/addons/aseprite_gd/preview_generator.gd "$DEST/"
           mkdir -p "$DEST/aseprite_scripts"
           cp tools/aseprite/name_tiles.lua "$DEST/aseprite_scripts/"
           cp libs/* "$DEST/bin/"
@@ -106,7 +106,7 @@ jobs:
           DEST=assetlib-tree/addons/aseprite_gd
           mkdir -p "$DEST/bin"
           cp godot/addons/aseprite_gd/plugin.cfg godot/addons/aseprite_gd/plugin.gd "$DEST/"
-          cp godot/addons/aseprite_gd/import_section.gd godot/addons/aseprite_gd/inspector_plugin.gd "$DEST/"
+          cp godot/addons/aseprite_gd/import_section.gd godot/addons/aseprite_gd/inspector_plugin.gd godot/addons/aseprite_gd/preview_generator.gd "$DEST/"
           mkdir -p "$DEST/aseprite_scripts"
           cp tools/aseprite/name_tiles.lua "$DEST/aseprite_scripts/"
           cp libs/* "$DEST/bin/"

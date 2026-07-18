@@ -32,6 +32,8 @@ teammates' machines, and in headless CI.
   lit pixel art
 - Cel user data text becomes AnimationLibrary method tracks (frame-accurate
   gameplay events)
+- Every `.aseprite` file shows its first frame as a FileSystem-dock
+  thumbnail, whatever importer it uses
 - Runtime loading: plain `load()` works on `.aseprite` files in running
   games, plus an `AseDocument` class for parsing, rendering, and slice/tag
   queries from GDScript
