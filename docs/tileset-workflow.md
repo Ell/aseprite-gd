@@ -50,3 +50,12 @@ source keeps its own texture region size, so tilesets with different tile
 dimensions coexist — smaller tiles just anchor within the grid cell. The
 fresh-import product sets `tile_size` from the file's first tileset; `sync`
 never touches it on a TileSet you own.
+
+## Naming tiles
+
+Aseprite currently has no built-in UI for per-tile user data (the field that
+becomes the `aseprite_text` custom data layer). The repository ships a dialog
+for it: install `tools/aseprite/name_tiles.lua` into Aseprite's scripts
+folder (File > Scripts > Open Scripts Folder, then Rescan), select a tilemap
+layer, and run it from File > Scripts — it steps through the tileset's tiles
+with a preview and a name field.
